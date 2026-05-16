@@ -1,0 +1,44 @@
+server:
+  port: 8788
+  servlet:
+    encoding:
+      charset: UTF-8
+      force: true
+
+spring:
+  datasource:
+    url: ${DB_URL:jdbc:postgresql://localhost:5432/resident}
+    username: ${DB_USER:resident}
+    password: ${DB_PASSWORD:resident}
+    hikari:
+      maximum-pool-size: 16
+  flyway:
+    locations: classpath:db/migration
+    baseline-on-migrate: true
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri: ${OIDC_ISSUER:http://localhost:8787/dev-idp}
+          # 開発時は jwk-set-uri を指定して HS256/RS256 鍵を取得する。
+          # TODO (Codex): IdP の JWKS エンドポイントを差し替え
+
+logging:
+  level:
+    org.springframework.web: INFO
+    org.springframework.jdbc.core: INFO
+    org.flywaydb: INFO
+
+management:
+  endpoints:
+    web:
+      exposure:
+        include: health,info,metrics
+
+springdoc:
+  api-docs:
+    path: /v3/api-docs
+  swagger-ui:
+    path: /swagger-ui.html
+    enabled: true
+  default-produces-media-type: application/json

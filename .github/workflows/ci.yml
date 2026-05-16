@@ -1,0 +1,49 @@
+name: resident-record-ci
+
+on:
+  push:
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  node-and-spring:
+    runs-on: ubuntu-latest
+    timeout-minutes: 20
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Generate OpenAPI types
+        run: npm run generate:openapi
+
+      - name: Check web and Node API
+        run: npm run check
+
+      - name: Node API smoke
+        run: npm run smoke
+
+      - name: Node API E2E
+        run: npm run e2e:api
+
+      - name: Build web
+        run: npm run web:build
+
+      - name: Setup Java
+        uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: "21"
+          cache: maven
+
+      - name: Spring tests
+        working-directory: apps/api-spring
+        run: mvn -B test

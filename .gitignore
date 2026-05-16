@@ -1,0 +1,41 @@
+# Node / Vite / Playwright
+node_modules/
+dist/
+.vite/
+coverage/
+test-results/
+playwright-report/
+*.log
+.env
+.env.*
+!.env.example
+
+# Java / Maven / Spring Boot
+target/
+*.class
+*.jar
+*.war
+.classpath
+.project
+.settings/
+.idea/
+*.iml
+build/
+.gradle/
+HELP.md
+.mvn/wrapper/maven-wrapper.jar
+
+# Runtime
+apps/api/data/runtime.json
+
+# OS / Editor
+.DS_Store
+Thumbs.db
+*.swp
+.vscode/
+!.vscode/extensions.json
+
+# Local archives / scratch
+*.zip
+*.tar.gz
+/_extracted/

@@ -1,0 +1,138 @@
+/* 標準帳票 0010001 住民票の写し（A4縦・1ページ） — print/preview 共用 */
+@page {
+  size: A4 portrait;
+  margin: 18mm 16mm 16mm 16mm;
+}
+
+.cert-paper {
+  background: #fffdf7;
+  color: #17212b;
+  width: 210mm;
+  min-height: 297mm;
+  padding: 18mm 16mm 16mm 16mm;
+  margin: 0 auto;
+  font: 12.5pt/1.7 "Yu Mincho", "Noto Serif CJK JP", "MS PMincho", serif;
+  box-sizing: border-box;
+  position: relative;
+}
+
+.cert-paper .frame {
+  border: 1.4mm double #2a2a2a;
+  padding: 8mm;
+  min-height: 232mm;
+  display: flex;
+  flex-direction: column;
+  gap: 7mm;
+}
+
+.cert-paper .title {
+  text-align: center;
+  font-size: 22pt;
+  letter-spacing: 0.4em;
+  font-weight: 700;
+  border-bottom: 0.4mm solid #2a2a2a;
+  padding-bottom: 4mm;
+}
+
+.cert-paper .meta {
+  display: grid;
+  grid-template-columns: 1fr 1fr;
+  font-size: 10.5pt;
+}
+.cert-paper .meta .right { text-align: right; }
+
+.cert-paper table.cert {
+  width: 100%;
+  border-collapse: collapse;
+  font-size: 12pt;
+}
+.cert-paper table.cert th,
+.cert-paper table.cert td {
+  border: 0.25mm solid #4a4a4a;
+  padding: 3mm 4mm;
+  vertical-align: top;
+  text-align: left;
+}
+.cert-paper table.cert th {
+  width: 32mm;
+  background: #f1ebd8;
+  font-weight: 600;
+  white-space: nowrap;
+}
+.cert-paper table.cert td.center { text-align: center; }
+
+.cert-paper .members {
+  margin-top: 4mm;
+}
+.cert-paper .members caption {
+  text-align: left;
+  font-weight: 600;
+  margin-bottom: 2mm;
+  font-size: 11pt;
+}
+
+.cert-paper .footer {
+  margin-top: auto;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  align-items: end;
+  gap: 8mm;
+}
+.cert-paper .footer .issue-date {
+  font-size: 12pt;
+}
+.cert-paper .footer .seal {
+  text-align: center;
+  font-size: 13pt;
+  display: grid;
+  gap: 1mm;
+}
+.cert-paper .footer .seal .mayor {
+  border: 0.6mm solid #b3261e;
+  color: #b3261e;
+  padding: 3mm 4mm;
+  border-radius: 50%;
+  display: inline-block;
+  font-weight: 700;
+}
+
+.cert-paper .verify {
+  margin-top: 6mm;
+  display: grid;
+  grid-template-columns: 1fr auto;
+  gap: 6mm;
+  align-items: center;
+  font-size: 9pt;
+  color: #444;
+}
+.cert-paper .verify .qr {
+  width: 28mm;
+  height: 28mm;
+  border: 0.4mm solid #444;
+  display: grid;
+  place-items: center;
+  font-family: ui-monospace, Consolas, monospace;
+  font-size: 6.5pt;
+  background:
+    repeating-linear-gradient(0deg, #000 0 0.6mm, transparent 0.6mm 1.6mm),
+    repeating-linear-gradient(90deg, #000 0 0.6mm, transparent 0.6mm 1.6mm);
+  background-blend-mode: lighten;
+  color: #000;
+}
+
+.cert-paper .masked { color: #888; letter-spacing: 0.1em; }
+
+/* プレビュー時の影 */
+@media screen {
+  .cert-paper {
+    box-shadow: 0 16px 36px rgba(46, 34, 16, 0.16);
+    margin: 24px auto;
+  }
+}
+
+/* 印刷時に他の UI を消す */
+@media print {
+  body * { visibility: hidden; }
+  .cert-paper, .cert-paper * { visibility: visible; }
+  .cert-paper { box-shadow: none; margin: 0; }
+}

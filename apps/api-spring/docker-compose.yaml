@@ -1,0 +1,15 @@
+services:
+  postgres:
+    image: postgres:16
+    container_name: resident-postgres
+    environment:
+      POSTGRES_DB: resident
+      POSTGRES_USER: resident
+      POSTGRES_PASSWORD: resident
+    ports:
+      - "5432:5432"
+    volumes:
+      - resident_pg:/var/lib/postgresql/data
+
+volumes:
+  resident_pg: {}

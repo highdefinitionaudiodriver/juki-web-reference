@@ -1,0 +1,655 @@
+openapi: 3.1.0
+info:
+  title: 住民記録システム Web版 API
+  version: 0.1.0
+  description: |
+    住民記録システム標準仕様書 第6.1版（令和8年3月25日版 / 自治体システム等標準化検討会）に準拠した
+    REST API の設計仕様（ドラフト）。ChromeOS Flex を含む Chromium 系ブラウザからの利用を想定。
+
+    - すべての永続化操作は監査ログに記録される。
+    - すべての応答は UTF-8 / application/json。日付は ISO 8601。
+    - 認可は OAuth2 / OIDC のスコープ + 属性ベース（ロール + 項目別マスク）。
+servers:
+  - url: https://{tenant}.juki.example.go.jp/api/v1
+    variables:
+      tenant: { default: city01 }
+
+tags:
+  - { name: auth,         description: 認証 }
+  - { name: residents,    description: 住民（管理項目・検索・照会） }
+  - { name: transactions, description: 異動（届出/職権/取消） }
+  - { name: certificates, description: 証明 }
+  - { name: restrictions, description: 抑止設定 }
+  - { name: reports,      description: 統計・年報 }
+  - { name: euc,          description: EUC（任意抽出） }
+  - { name: link,         description: 外部連携（CS/番号/庁内/申請管理） }
+  - { name: admin,        description: 管理（ユーザ/ロール/権限/監査） }
+  - { name: verify,       description: 改ざん防止検証（公開） }
+
+security:
+  - oidc: [residents.read, residents.write, transactions.write, certificates.issue, admin]
+
+paths:
+
+  # ===== 認証 =====
+  /auth/login:
+    post:
+      tags: [auth]
+      security: []
+      summary: ログイン
+      requestBody: { $ref: '#/components/requestBodies/LoginReq' }
+      responses:
+        '200': { $ref: '#/components/responses/LoginRes' }
+        '401': { $ref: '#/components/responses/Unauthorized' }
+  /auth/logout:
+    post: { tags: [auth], summary: ログアウト, responses: { '204': { description: OK } } }
+  /me:
+    get:
+      tags: [auth]
+      summary: ログイン中ユーザ情報
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Me' } }
+
+  # ===== 住民 =====
+  /residents/search:
+    post:
+      tags: [residents]
+      summary: 住民検索
+      description: 抑止対象は権限を持たないユーザには存在自体を隠蔽（404 相当を「該当なし」として返す）
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/ResidentSearchReq' } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/PagedResidents' } }
+  /residents/{residentId}:
+    get:
+      tags: [residents]
+      summary: 住民詳細（時点照会対応）
+      parameters:
+        - { name: residentId, in: path, required: true, schema: { type: string } }
+        - { name: asOf,       in: query, schema: { type: string, format: date-time } }
+        - { name: unmask,     in: query, schema: { type: array, items: { type: string, enum: [my_number, jumin_code] } }, description: 権限必須 }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/Resident' } }
+        '403': { $ref: '#/components/responses/Forbidden' }
+        '404': { $ref: '#/components/responses/NotFound' }
+    put:
+      tags: [residents]
+      summary: 住民更新（単項目修正：軽微）
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/ResidentPatch' } }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/Resident' } } } }
+  /residents/{residentId}/history:
+    get:
+      tags: [residents]
+      summary: 異動履歴一覧
+      parameters:
+        - { name: residentId, in: path, required: true, schema: { type: string } }
+        - { name: from, in: query, schema: { type: string, format: date } }
+        - { name: to,   in: query, schema: { type: string, format: date } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Transaction' } } }
+  /residents/{residentId}/alias:
+    post:
+      tags: [residents]
+      summary: 通称・旧氏の登録
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/AliasName' } }
+      responses: { '201': { description: Created } }
+
+  # ===== 異動 =====
+  /transactions/in:
+    post:
+      tags: [transactions]
+      summary: 転入届の受付・反映
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/MoveInReq' } } }
+      responses:
+        '201':
+          description: Created
+          content: { application/json: { schema: { $ref: '#/components/schemas/Transaction' } } }
+  /transactions/out:
+    post:
+      tags: [transactions]
+      summary: 転出届
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MoveOutReq' } } } }
+      responses:
+        '201':
+          description: Created（転出証明書発行情報を含む）
+          content: { application/json: { schema: { $ref: '#/components/schemas/TransactionWithCertificate' } } }
+  /transactions/move:
+    post:
+      tags: [transactions]
+      summary: 転居届
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MoveInternalReq' } } } }
+      responses: { '201': { description: Created } }
+  /transactions/household:
+    post:
+      tags: [transactions]
+      summary: 世帯変更（世帯主変更・分離・合併）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/HouseholdChangeReq' } } } }
+      responses: { '201': { description: Created } }
+  /transactions/birth:
+    post: { tags: [transactions], summary: 出生連動（戸籍通知）, responses: { '201': { description: Created } } }
+  /transactions/death:
+    post: { tags: [transactions], summary: 死亡連動（戸籍通知）, responses: { '201': { description: Created } } }
+  /transactions/koseki:
+    post: { tags: [transactions], summary: 戸籍異動連動（婚姻/離婚等）, responses: { '201': { description: Created } } }
+  /transactions/official:
+    post:
+      tags: [transactions]
+      summary: 職権異動 起票
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/OfficialTxReq' } } } }
+      responses: { '201': { description: Created } }
+  /transactions/{txId}/approve:
+    post:
+      tags: [transactions]
+      summary: 職権異動 決裁（承認/差戻/却下）
+      parameters: [ { name: txId, in: path, required: true, schema: { type: string } } ]
+      requestBody:
+        required: true
+        content: { application/json: { schema: { $ref: '#/components/schemas/ApprovalReq' } } }
+      responses: { '200': { description: OK } }
+  /transactions/cancel:
+    post:
+      tags: [transactions]
+      summary: 異動取消（標準仕様 4.6）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CancelReq' } } } }
+      responses: { '201': { description: Created } }
+
+  # 住民票コード / 個人番号 / 外国人在留
+  /codes/jumin:
+    post:
+      tags: [transactions]
+      summary: 住民票コード 付番/変更/修正
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/JuminCodeReq' } } } }
+      responses: { '201': { description: Created } }
+  /codes/mynumber:
+    post:
+      tags: [transactions]
+      summary: 個人番号 付番/変更/修正
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/MyNumberReq' } } } }
+      responses: { '201': { description: Created } }
+  /residents/{residentId}/foreigner:
+    put:
+      tags: [transactions]
+      summary: 外国人住民 在留情報更新（4.5）
+      parameters: [ { name: residentId, in: path, required: true, schema: { type: string } } ]
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ForeignerInfo' } } } }
+      responses: { '200': { description: OK } }
+
+  # ===== 証明 =====
+  /certificates/jumin:
+    post:
+      tags: [certificates]
+      summary: 住民票の写し発行（0010001/0010003）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/CertificateReq' } } } }
+      responses:
+        '201':
+          description: Created（PDFリンクと改ざん防止トークン）
+          content: { application/json: { schema: { $ref: '#/components/schemas/CertificateIssue' } } }
+  /certificates/items:
+    post: { tags: [certificates], summary: 住民票記載事項証明書（0010002）, responses: { '201': { description: Created } } }
+  /certificates/removed:
+    post: { tags: [certificates], summary: 除票の写し（0010004）, responses: { '201': { description: Created } } }
+  /certificates/inspection:
+    post: { tags: [certificates], summary: 一部の写し（閲覧用・0010005）, responses: { '201': { description: Created } } }
+  /certificates/out:
+    post: { tags: [certificates], summary: 転出証明書（0010007/0010008）, responses: { '201': { description: Created } } }
+  /certificates/{issueId}/pdf:
+    get:
+      tags: [certificates]
+      summary: 発行済証明書PDF取得
+      description: PDF/A生成サービス接続前は簡易PDFを返す。正式実装では帳票テンプレートからPDF/A-2bを生成する。
+      parameters:
+        - { name: issueId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200':
+          description: PDF
+          content:
+            application/pdf:
+              schema: { type: string, format: binary }
+        '404': { $ref: '#/components/responses/NotFound' }
+  /verify/{token}:
+    get:
+      tags: [verify]
+      security: []
+      summary: 改ざん防止コード検証（外部公開）
+      parameters: [ { name: token, in: path, required: true, schema: { type: string } } ]
+      responses:
+        '200':
+          description: OK（発行メタ情報のみ）
+          content: { application/json: { schema: { $ref: '#/components/schemas/VerifyResult' } } }
+        '404': { $ref: '#/components/responses/NotFound' }
+
+  # ===== 抑止 =====
+  /restrictions:
+    post:
+      tags: [restrictions]
+      summary: 抑止登録（DV等支援措置）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/Restriction' } } } }
+      responses: { '201': { description: Created } }
+  /restrictions/{id}:
+    delete:
+      tags: [restrictions]
+      summary: 抑止解除（解除権限ロールのみ）
+      parameters: [ { name: id, in: path, required: true, schema: { type: string } } ]
+      responses: { '204': { description: OK } }
+
+  # ===== 統計 / EUC =====
+  /reports/annual:
+    post:
+      tags: [reports]
+      summary: 住基年報（標準仕様 20.6）
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ReportReq' } } } }
+      responses:
+        '202':
+          description: 受付（非同期）
+          content: { application/json: { schema: { $ref: '#/components/schemas/AsyncJob' } } }
+  /reports/population:
+    post: { tags: [reports], summary: 人口動態, responses: { '202': { description: 受付 } } }
+  /reports/{jobId}:
+    get:
+      tags: [reports]
+      summary: 集計ジョブ状態
+      parameters: [ { name: jobId, in: path, required: true, schema: { type: string } } ]
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AsyncJob' } } } }
+  /euc/query:
+    post:
+      tags: [euc]
+      summary: EUC（任意抽出）
+      description: 個人番号が出力対象に含まれる場合は二段階承認、結果はパスワード付ZIP配信。
+      requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EucQueryReq' } } } }
+      responses:
+        '202': { description: 受付, content: { application/json: { schema: { $ref: '#/components/schemas/AsyncJob' } } } }
+
+  # ===== 連携 =====
+  /link/cs/inbound:
+    post: { tags: [link], summary: 住基ネットCS受信, responses: { '202': { description: 受付 } } }
+  /link/number/inbound:
+    post: { tags: [link], summary: 番号連携受信, responses: { '202': { description: 受付 } } }
+  /link/internal/{partner}:
+    post:
+      tags: [link]
+      summary: 庁内他業務（税/国保/選挙 等）
+      parameters: [ { name: partner, in: path, required: true, schema: { type: string, enum: [tax, insurance, election, koseki, application] } } ]
+      responses: { '202': { description: 受付 } }
+  /link/application/inbound:
+    post: { tags: [link], summary: 申請管理システム受信, responses: { '202': { description: 受付 } } }
+
+  # ===== 管理 =====
+  /admin/users:
+    get:  { tags: [admin], summary: ユーザ一覧, responses: { '200': { description: OK } } }
+    post: { tags: [admin], summary: ユーザ作成, responses: { '201': { description: Created } } }
+  /admin/roles:
+    get:  { tags: [admin], summary: ロール一覧, responses: { '200': { description: OK } } }
+    post: { tags: [admin], summary: ロール作成, responses: { '201': { description: Created } } }
+  /admin/permissions:
+    post: { tags: [admin], summary: 権限マトリクス更新, responses: { '200': { description: OK } } }
+  /audit:
+    get:
+      tags: [admin]
+      summary: 監査ログ参照
+      parameters:
+        - { name: from, in: query, schema: { type: string, format: date-time } }
+        - { name: to,   in: query, schema: { type: string, format: date-time } }
+        - { name: userId, in: query, schema: { type: string } }
+        - { name: residentId, in: query, schema: { type: string } }
+        - { name: action, in: query, schema: { type: string } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AuditLog' } } }
+
+components:
+
+  securitySchemes:
+    oidc:
+      type: openIdConnect
+      openIdConnectUrl: https://idp.example.go.jp/.well-known/openid-configuration
+
+  requestBodies:
+    LoginReq:
+      required: true
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              employeeId: { type: string }
+              password:   { type: string, format: password }
+              webauthn:   { type: object, description: WebAuthn アサーション（任意） }
+
+  responses:
+    LoginRes:
+      description: OK
+      content:
+        application/json:
+          schema:
+            type: object
+            properties:
+              accessToken: { type: string }
+              expiresIn:   { type: integer }
+              me:          { $ref: '#/components/schemas/Me' }
+    Unauthorized: { description: 認証エラー, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    Forbidden:    { description: 権限エラー, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+    NotFound:     { description: 該当なし, content: { application/json: { schema: { $ref: '#/components/schemas/Error' } } } }
+
+  schemas:
+
+    Error:
+      type: object
+      required: [code, message]
+      properties:
+        code:    { type: string, example: VALIDATION_ERROR }
+        message: { type: string }
+        details: { type: array, items: { type: object } }
+
+    Me:
+      type: object
+      properties:
+        userId:     { type: string }
+        fullName:   { type: string }
+        department: { type: string }
+        roles:      { type: array, items: { type: string } }
+
+    Resident:
+      type: object
+      properties:
+        residentId:        { type: string, description: 宛名番号 }
+        familyNameKanji:   { type: string }
+        givenNameKanji:    { type: string }
+        familyNameKana:    { type: string }
+        givenNameKana:     { type: string }
+        birthDate:         { type: string, format: date }
+        sex:               { type: string, enum: [M, F, U] }
+        addressCode:       { type: string }
+        addressText:       { type: string }
+        householdId:       { type: string }
+        relationToHead:    { type: string }
+        movedInDate:       { type: string, format: date }
+        movedOutDate:      { type: string, format: date, nullable: true }
+        juminCode:         { type: string, description: 'マスク済 or 平文（権限による）' }
+        myNumber:          { type: string, description: 'マスク済 or 平文（権限による）' }
+        nationality:       { type: string, nullable: true }
+        foreigner:         { $ref: '#/components/schemas/ForeignerInfo' }
+        alias:             { type: array, items: { $ref: '#/components/schemas/AliasName' } }
+        restrictions:      { type: array, items: { $ref: '#/components/schemas/Restriction' } }
+        validFrom:         { type: string, format: date-time }
+        validTo:           { type: string, format: date-time, nullable: true }
+
+    ResidentPatch:
+      type: object
+      properties:
+        addressText:  { type: string }
+        addressCode:  { type: string }
+        reasonCode:   { type: string }
+        eventDate:    { type: string, format: date }
+
+    ResidentSearchReq:
+      type: object
+      properties:
+        name:        { type: string }
+        kana:        { type: string }
+        birthDate:   { type: string, format: date }
+        sex:         { type: string, enum: [M, F] }
+        residentId:  { type: string }
+        juminCode:   { type: string }
+        myNumber:    { type: string, description: 権限必須 }
+        address:     { type: string }
+        householdHeadOnly: { type: boolean }
+        foreignerOnly:     { type: boolean }
+        includeRemoved:    { type: boolean, default: false }
+        page:        { type: integer, default: 1 }
+        size:        { type: integer, default: 50 }
+
+    PagedResidents:
+      type: object
+      properties:
+        total: { type: integer }
+        page:  { type: integer }
+        size:  { type: integer }
+        items: { type: array, items: { $ref: '#/components/schemas/Resident' } }
+
+    ForeignerInfo:
+      type: object
+      properties:
+        residenceStatus:        { type: string }
+        residencePeriodEnd:     { type: string, format: date }
+        passportNo:             { type: string }
+        nationalityFull:        { type: string }
+        aliasKanji:             { type: string, description: 通称 }
+        specialPermanentResident: { type: boolean }
+
+    AliasName:
+      type: object
+      properties:
+        kind:      { type: string, enum: [ALIAS, FORMER_FAMILY] }
+        valueKanji: { type: string }
+        valueKana: { type: string }
+        validFrom: { type: string, format: date }
+        validTo:   { type: string, format: date, nullable: true }
+
+    Restriction:
+      type: object
+      properties:
+        id:          { type: string, readOnly: true }
+        residentId:  { type: string }
+        category:    { type: string, enum: [DV, STALKER, CHILD_ABUSE, OTHER] }
+        startDate:   { type: string, format: date }
+        endDate:     { type: string, format: date }
+        scope:       { type: string, enum: [SELF, HOUSEHOLD] }
+        releaseRole: { type: string }
+        note:        { type: string }
+
+    Transaction:
+      type: object
+      properties:
+        transactionId:        { type: string }
+        residentId:           { type: string }
+        householdId:          { type: string }
+        typeCode:             { type: string, description: 'IN/OUT/MOVE/HH/BIRTH/DEATH/OFFICIAL/CANCEL ...' }
+        reasonCode:           { type: string }
+        eventDate:            { type: string, format: date }
+        processedDate:        { type: string, format: date }
+        receiverOffice:       { type: string }
+        status:               { type: string, enum: [DRAFT, REVIEW, APPROVED, APPLIED, CANCELLED] }
+        parentTransactionId:  { type: string, nullable: true }
+        items:                { type: array, items: { $ref: '#/components/schemas/TransactionItem' } }
+
+    TransactionItem:
+      type: object
+      properties:
+        field:       { type: string }
+        valueBefore: { type: string, nullable: true }
+        valueAfter:  { type: string, nullable: true }
+
+    MoveInReq:
+      type: object
+      required: [eventDate, members]
+      properties:
+        eventDate:           { type: string, format: date }
+        previousAddress:     { type: string }
+        moveOutCertNo:       { type: string }
+        members:             { type: array, items: { $ref: '#/components/schemas/MoveMember' } }
+    MoveMember:
+      type: object
+      properties:
+        familyNameKanji: { type: string }
+        givenNameKanji:  { type: string }
+        familyNameKana:  { type: string }
+        givenNameKana:   { type: string }
+        birthDate:       { type: string, format: date }
+        sex:             { type: string, enum: [M, F, U] }
+        relationToHead:  { type: string }
+        myNumber:        { type: string }
+        foreigner:       { $ref: '#/components/schemas/ForeignerInfo' }
+
+    MoveOutReq:
+      type: object
+      required: [eventDate, members, newAddress]
+      properties:
+        eventDate:    { type: string, format: date }
+        newAddress:   { type: string }
+        newAddressCode: { type: string }
+        reasonCode:   { type: string }
+        members:      { type: array, items: { type: string, description: residentId } }
+
+    MoveInternalReq:
+      type: object
+      required: [eventDate, householdId, newAddress]
+      properties:
+        eventDate:   { type: string, format: date }
+        householdId: { type: string }
+        newAddress:  { type: string }
+        newAddressCode: { type: string }
+
+    HouseholdChangeReq:
+      type: object
+      properties:
+        operation:    { type: string, enum: [HEAD_CHANGE, SPLIT, MERGE] }
+        householdId:  { type: string }
+        newHeadResidentId: { type: string }
+        eventDate:    { type: string, format: date }
+        details:      { type: object }
+
+    OfficialTxReq:
+      type: object
+      required: [residentId, reasonCode, eventDate, content]
+      properties:
+        residentId:  { type: string }
+        reasonCode:  { type: string, enum: [OFFICIAL_WRITE, OFFICIAL_FIX, OFFICIAL_DELETE] }
+        eventDate:   { type: string, format: date }
+        legalBasis:  { type: string }
+        content:     { type: string }
+        attachments: { type: array, items: { type: string, format: uri } }
+        approvalRoute: { type: array, items: { type: string, description: roleId } }
+
+    ApprovalReq:
+      type: object
+      properties:
+        action:   { type: string, enum: [APPROVE, REMAND, REJECT, CONDITIONAL] }
+        comment:  { type: string }
+
+    CancelReq:
+      type: object
+      required: [transactionId, reason]
+      properties:
+        transactionId: { type: string }
+        reason:        { type: string }
+
+    JuminCodeReq:
+      type: object
+      properties:
+        residentId: { type: string }
+        operation:  { type: string, enum: [ISSUE, CHANGE, FIX] }
+        code:       { type: string, description: 'CHANGE/FIX 時の新コード' }
+
+    MyNumberReq:
+      type: object
+      properties:
+        residentId: { type: string }
+        operation:  { type: string, enum: [ISSUE, CHANGE, FIX] }
+        number:     { type: string }
+
+    CertificateReq:
+      type: object
+      required: [residentId, formId]
+      properties:
+        residentId:         { type: string }
+        formId:             { type: string, enum: ["0010001", "0010002", "0010003", "0010004", "0010005", "0010007", "0010008"] }
+        scope:              { type: string, enum: [SELF, HOUSEHOLD, MEMBERS] }
+        showJuminCode:      { type: boolean }
+        showMyNumber:       { type: boolean }
+        showKoseki:         { type: boolean }
+        showHeadAndRelation: { type: boolean }
+        copies:             { type: integer }
+        usageText:          { type: string }
+
+    CertificateIssue:
+      type: object
+      properties:
+        issueId:     { type: string }
+        residentId:  { type: string }
+        formId:      { type: string }
+        copies:      { type: integer }
+        fee:         { type: integer }
+        verifyToken: { type: string }
+        pdfUrl:      { type: string, format: uri }
+        issuedAt:    { type: string, format: date-time }
+        channel:     { type: string, enum: [WINDOW, CVS, ONLINE] }
+
+    VerifyResult:
+      type: object
+      properties:
+        valid:       { type: boolean }
+        formId:      { type: string }
+        issuedAt:    { type: string, format: date-time }
+        issuerOffice: { type: string }
+
+    TransactionWithCertificate:
+      allOf:
+        - $ref: '#/components/schemas/Transaction'
+        - type: object
+          properties:
+            certificate: { $ref: '#/components/schemas/CertificateIssue' }
+
+    ReportReq:
+      type: object
+      properties:
+        templateId: { type: string }
+        fiscalYear: { type: integer }
+        format:     { type: string, enum: [XLSX, PDF], default: XLSX }
+        params:     { type: object }
+
+    EucQueryReq:
+      type: object
+      properties:
+        templateId: { type: string, nullable: true }
+        sql:        { type: string, description: テンプレ ID なしの場合のみ }
+        filters:    { type: object }
+        outputFields: { type: array, items: { type: string } }
+        format:     { type: string, enum: [CSV, XLSX], default: CSV }
+        includeMyNumber: { type: boolean, default: false }
+
+    AsyncJob:
+      type: object
+      properties:
+        jobId:     { type: string }
+        status:    { type: string, enum: [QUEUED, RUNNING, DONE, FAILED] }
+        progress:  { type: integer, minimum: 0, maximum: 100 }
+        resultUrl: { type: string, format: uri, nullable: true }
+        error:     { type: string, nullable: true }
+
+    AuditLog:
+      type: object
+      properties:
+        logId:        { type: integer }
+        userId:       { type: string }
+        ip:           { type: string }
+        action:       { type: string }
+        resourceType: { type: string }
+        resourceId:   { type: string }
+        occurredAt:   { type: string, format: date-time }
+        details:      { type: object, additionalProperties: true }

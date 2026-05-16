@@ -1,0 +1,289 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>住民記録システム ER図</title>
+<style>
+  body{font:13px/1.6 "Yu Gothic UI","Meiryo",system-ui,sans-serif;background:#f3f5f9;color:#1f2937;margin:0;padding:24px}
+  h1{font-size:18px;margin:0 0 4px}
+  .meta{color:#5b6675;font-size:12px;margin-bottom:16px}
+  .panel{background:#fff;border:1px solid #cdd5e0;border-radius:6px;padding:16px;margin-bottom:24px}
+  h2{font-size:14px;border-left:4px solid #1f4e78;padding-left:8px;margin:0 0 12px}
+  pre.src{background:#fafbfd;border:1px solid #cdd5e0;border-radius:4px;padding:10px;font-size:11px;overflow:auto;max-height:300px}
+  .legend{font-size:12px;color:#5b6675}
+  .legend b{color:#1f4e78}
+  table{border-collapse:collapse;font-size:12px;width:100%}
+  th,td{border:1px solid #cdd5e0;padding:4px 8px;text-align:left}
+  th{background:#eef2f7}
+</style>
+<script src="https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.min.js"></script>
+<script>mermaid.initialize({startOnLoad:true, theme:'default', er:{useMaxWidth:true}});</script>
+</head>
+<body>
+<h1>住民記録システム Web版 ER図</h1>
+<div class="meta">準拠：住民記録システム標準仕様書 第6.1版（令和8年3月25日）／ 第3章 1.管理項目・4.異動・5.証明 ほか／ データ要件・連携要件標準仕様書</div>
+
+<div class="panel">
+  <h2>1. 全体ER（コア）</h2>
+  <div class="legend">凡例：<b>PK</b>=主キー、<b>FK</b>=外部キー、SCD-2=Slowly Changing Dimension Type2（履歴保持）</div>
+  <div class="mermaid">
+erDiagram
+  RESIDENT ||--o| RESIDENT_FOREIGNER : "1:0..1"
+  RESIDENT ||--o{ RESIDENT_HISTORY    : "1:N (SCD-2)"
+  RESIDENT ||--o{ ALIAS_NAME          : "通称・旧氏"
+  RESIDENT ||--o{ JUMIN_CODE          : "住民票コード履歴"
+  RESIDENT ||--o{ MY_NUMBER           : "個人番号履歴"
+  RESIDENT }o--|| HOUSEHOLD           : "現世帯"
+  RESIDENT ||--o{ HOUSEHOLD_MEMBER    : "世帯所属(履歴)"
+  HOUSEHOLD ||--o{ HOUSEHOLD_MEMBER   : "1:N"
+  RESIDENT ||--o{ RESTRICTION         : "DV等支援措置"
+  RESIDENT ||--o{ TRANSACTION         : "対象住民"
+  TRANSACTION ||--o{ TRANSACTION_ITEM : "項目別変更"
+  TRANSACTION }o--|| TRANSACTION_TYPE : "区分(届出/職権)"
+  TRANSACTION ||--o{ TRANSACTION_APPROVAL : "決裁ルート"
+  TRANSACTION ||--o{ CERTIFICATE_ISSUE    : "発行起点(任意)"
+  RESIDENT ||--o{ CERTIFICATE_ISSUE       : "発行履歴"
+  USER_ACCOUNT ||--o{ AUDIT_LOG       : "1:N"
+  USER_ACCOUNT }o--o{ ROLE            : "M:N (USER_ROLE)"
+  ROLE ||--o{ PERMISSION              : "1:N"
+  LINK_PARTNER ||--o{ LINK_EVENT      : "連携イベント"
+  TRANSACTION ||--o{ LINK_EVENT       : "派生連携"
+  REPORT_REQUEST }o--|| USER_ACCOUNT  : "依頼者"
+
+  RESIDENT {
+    varchar resident_id PK "宛名番号"
+    varchar household_id FK
+    varchar family_name_kanji
+    varchar given_name_kanji
+    varchar family_name_kana
+    varchar given_name_kana
+    date    birth_date
+    char    sex
+    varchar nationality "外国人時"
+    varchar address_code
+    varchar address_text
+    date    moved_in_date
+    date    moved_out_date
+    boolean restricted_flag
+    timestamp valid_from
+    timestamp valid_to
+  }
+  RESIDENT_FOREIGNER {
+    varchar resident_id PK,FK
+    varchar residence_status
+    date    residence_period_end
+    varchar passport_no
+    varchar nationality_full
+    varchar alias_kanji "通称"
+    boolean special_permanent_resident
+  }
+  HOUSEHOLD {
+    varchar household_id PK
+    varchar head_resident_id FK
+    varchar address_code
+    varchar address_text
+    date    established_date
+    date    closed_date
+  }
+  HOUSEHOLD_MEMBER {
+    varchar household_id PK,FK
+    varchar resident_id  PK,FK
+    varchar relation_to_head
+    date    joined_date
+    date    left_date
+  }
+  RESIDENT_HISTORY {
+    varchar resident_id PK,FK
+    timestamp valid_from PK
+    timestamp valid_to
+    jsonb snapshot "全項目スナップショット"
+    varchar transaction_id FK
+  }
+  ALIAS_NAME {
+    bigint alias_id PK
+    varchar resident_id FK
+    varchar kind "通称/旧氏"
+    varchar value_kanji
+    varchar value_kana
+    date    valid_from
+    date    valid_to
+  }
+  JUMIN_CODE {
+    bigint id PK
+    varchar resident_id FK
+    varchar code "11桁"
+    date    valid_from
+    date    valid_to
+    varchar event "付番/変更/修正"
+  }
+  MY_NUMBER {
+    bigint id PK
+    varchar resident_id FK
+    varchar number "12桁(暗号化)"
+    date    valid_from
+    date    valid_to
+    varchar event
+  }
+  RESTRICTION {
+    bigint restriction_id PK
+    varchar resident_id FK
+    varchar category "DV/ストーカー/児童虐待"
+    date    start_date
+    date    end_date
+    varchar scope "本人/世帯"
+    varchar release_role
+    text    note
+  }
+  TRANSACTION {
+    varchar transaction_id PK
+    varchar resident_id FK
+    varchar household_id FK
+    varchar type_code FK "届出/職権/取消等"
+    varchar reason_code
+    date    event_date "異動年月日"
+    date    processed_date
+    varchar receiver_office
+    varchar status "起票/審査/承認/反映/取消"
+    varchar parent_transaction_id FK "取消元"
+  }
+  TRANSACTION_TYPE {
+    varchar code PK
+    varchar name
+    varchar category "届出/職権/連動/取消"
+  }
+  TRANSACTION_ITEM {
+    varchar transaction_id PK,FK
+    varchar field PK
+    text    value_before
+    text    value_after
+  }
+  TRANSACTION_APPROVAL {
+    bigint id PK
+    varchar transaction_id FK
+    int     step
+    varchar role
+    varchar approver_user_id FK
+    varchar status
+    text    comment
+    timestamp acted_at
+  }
+  CERTIFICATE_ISSUE {
+    bigint issue_id PK
+    varchar resident_id FK
+    varchar transaction_id FK
+    varchar form_id "0010001 等"
+    int     copies
+    varchar usage_text
+    int     fee
+    varchar verify_token "改ざん防止"
+    timestamp issued_at
+    varchar issuer_user_id FK
+    varchar channel "窓口/コンビニ/オンライン"
+  }
+  USER_ACCOUNT {
+    varchar user_id PK
+    varchar oidc_subject
+    varchar employee_no
+    varchar department
+    varchar full_name
+    boolean active
+  }
+  ROLE {
+    varchar role_id PK
+    varchar name
+    text    description
+  }
+  USER_ROLE {
+    varchar user_id PK,FK
+    varchar role_id PK,FK
+    date    valid_from
+    date    valid_to
+  }
+  PERMISSION {
+    varchar role_id PK,FK
+    varchar resource PK "機能/項目"
+    varchar action   PK "view/edit/approve"
+    varchar mask     "個人番号 等"
+  }
+  AUDIT_LOG {
+    bigint log_id PK
+    varchar user_id FK
+    varchar ip
+    varchar action
+    varchar resource_type
+    varchar resource_id
+    timestamp occurred_at
+    jsonb   details
+  }
+  LINK_PARTNER {
+    varchar partner_id PK
+    varchar name "CS/番号/戸籍/税/国保/選挙/申請管理"
+    varchar endpoint
+    varchar protocol
+  }
+  LINK_EVENT {
+    bigint event_id PK
+    varchar partner_id FK
+    varchar transaction_id FK
+    varchar direction "in/out"
+    timestamp occurred_at
+    varchar status
+    jsonb   payload
+  }
+  REPORT_REQUEST {
+    bigint report_id PK
+    varchar requester_user_id FK
+    varchar template_id
+    jsonb   params
+    varchar status
+    varchar file_path
+    timestamp created_at
+  }
+  </div>
+</div>
+
+<div class="panel">
+  <h2>2. 履歴管理（SCD-2）の考え方</h2>
+  <ul>
+    <li><b>RESIDENT</b> は現在値のみを保持。すべての変更は <b>TRANSACTION</b> + <b>TRANSACTION_ITEM</b> + <b>RESIDENT_HISTORY</b>（jsonb スナップショット）に記録。</li>
+    <li>時点照会（標準仕様書 1.2.1）は <code>RESIDENT_HISTORY.valid_from &lt;= asOf &lt; valid_to</code> で1行を特定。</li>
+    <li>取消（4.6）は <code>TRANSACTION.parent_transaction_id</code> を辿る論理取消。物理削除は禁止。</li>
+    <li>個人番号・住民票コードは独立テーブルで世代管理し、最新は <code>valid_to IS NULL</code>。</li>
+  </ul>
+</div>
+
+<div class="panel">
+  <h2>3. 抑止・権限（10.3 / 10.4）</h2>
+  <ul>
+    <li>RESIDENT 取得時は <b>RESTRICTION</b> を必ず参照。要求ユーザのROLEに <code>PERMISSION.action='view'</code> が無ければ <b>404 相当</b>を返す（存在自体を隠蔽）。</li>
+    <li>項目別マスク：<code>PERMISSION.mask</code> に「個人番号」「住民票コード」等を列挙し、API レイヤで値を <code>****</code> に置換。</li>
+    <li>抑止解除権限を持つロールのみ、解除画面 (SCR-301) へのアクセスを許可。</li>
+  </ul>
+</div>
+
+<div class="panel">
+  <h2>4. インデックス指針（PostgreSQL）</h2>
+  <table>
+    <tr><th>テーブル</th><th>インデックス</th><th>用途</th></tr>
+    <tr><td>resident</td><td>(family_name_kana, given_name_kana)</td><td>カナ検索</td></tr>
+    <tr><td>resident</td><td>(birth_date)</td><td>生年月日絞り込み</td></tr>
+    <tr><td>resident</td><td>GIN (address_text gin_trgm_ops)</td><td>住所あいまい検索</td></tr>
+    <tr><td>resident</td><td>UNIQUE (jumin_code) WHERE valid_to IS NULL</td><td>現行コード一意</td></tr>
+    <tr><td>my_number</td><td>UNIQUE (number_hash) WHERE valid_to IS NULL</td><td>重複検知</td></tr>
+    <tr><td>resident_history</td><td>(resident_id, valid_from DESC)</td><td>時点照会</td></tr>
+    <tr><td>transaction</td><td>(resident_id, event_date DESC)</td><td>履歴一覧</td></tr>
+    <tr><td>audit_log</td><td>(occurred_at, user_id)</td><td>監査参照</td></tr>
+  </table>
+</div>
+
+<div class="panel">
+  <h2>5. ソース（Mermaid）コピー用</h2>
+  <details><summary>展開して全文を表示／コピー</summary>
+<pre class="src" id="src">erDiagram
+  (上のMermaid図の本文を参照)
+</pre>
+  </details>
+</div>
+
+</body>
+</html>

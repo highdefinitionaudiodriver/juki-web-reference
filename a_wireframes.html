@@ -1,0 +1,541 @@
+<!doctype html>
+<html lang="ja">
+<head>
+<meta charset="utf-8">
+<title>住民記録システム Web版 ワイヤーフレーム</title>
+<style>
+  :root{
+    --bg:#f3f5f9; --panel:#fff; --line:#cdd5e0; --ink:#1f2937; --sub:#5b6675;
+    --accent:#1f4e78; --accent2:#2e75b6; --ok:#1e7d32; --warn:#c97b00; --err:#b3261e;
+    --chip:#e7eef7;
+  }
+  *{box-sizing:border-box}
+  html,body{margin:0;background:var(--bg);color:var(--ink);font:13px/1.5 "Yu Gothic UI","Meiryo",system-ui,sans-serif}
+  header.app{position:sticky;top:0;z-index:5;background:var(--accent);color:#fff;padding:8px 16px;display:flex;gap:12px;align-items:center}
+  header.app h1{margin:0;font-size:14px;font-weight:600}
+  header.app nav{margin-left:auto;display:flex;gap:6px;flex-wrap:wrap}
+  header.app nav a{color:#fff;text-decoration:none;font-size:12px;background:rgba(255,255,255,.12);padding:4px 8px;border-radius:4px}
+  header.app nav a:hover{background:rgba(255,255,255,.25)}
+  .toc{padding:16px;max-width:1200px;margin:0 auto}
+  .toc h2{font-size:14px;margin:0 0 8px}
+  .toc ol{columns:3;font-size:12px}
+  main{max-width:1200px;margin:0 auto;padding:8px 16px 64px}
+  .screen{background:var(--panel);border:1px solid var(--line);border-radius:6px;margin:24px 0;overflow:hidden;box-shadow:0 1px 0 rgba(0,0,0,.03)}
+  .screen > header{background:#eaf0f7;border-bottom:1px solid var(--line);padding:8px 12px;display:flex;gap:12px;align-items:center}
+  .screen > header h3{margin:0;font-size:13px}
+  .screen > header .id{background:var(--accent2);color:#fff;font-size:11px;padding:2px 8px;border-radius:10px}
+  .screen > header .api{margin-left:auto;color:var(--sub);font-size:11px;font-family:ui-monospace,Consolas,monospace}
+  .body{padding:12px}
+  .row{display:flex;gap:8px;flex-wrap:wrap;align-items:end;margin-bottom:8px}
+  .row .grow{flex:1}
+  .field{display:flex;flex-direction:column;gap:2px}
+  .field label{font-size:11px;color:var(--sub)}
+  .input,.select{height:28px;border:1px solid var(--line);border-radius:4px;padding:0 8px;background:#fff;min-width:120px;font:inherit}
+  .btn{height:28px;border:1px solid var(--accent);background:var(--accent);color:#fff;border-radius:4px;padding:0 12px;cursor:pointer;font:inherit}
+  .btn.sec{background:#fff;color:var(--accent)}
+  .btn.warn{background:var(--warn);border-color:var(--warn)}
+  .btn.danger{background:var(--err);border-color:var(--err)}
+  table.t{width:100%;border-collapse:collapse;font-size:12px}
+  table.t th,table.t td{border:1px solid var(--line);padding:4px 6px;text-align:left;vertical-align:top}
+  table.t th{background:#eef2f7;font-weight:600}
+  .chip{display:inline-block;background:var(--chip);color:var(--accent);font-size:11px;border-radius:10px;padding:1px 8px;margin-right:4px}
+  .chip.warn{background:#fff3e0;color:var(--warn)}
+  .chip.err{background:#fdecea;color:var(--err)}
+  .chip.ok{background:#e6f4ea;color:var(--ok)}
+  .grid2{display:grid;grid-template-columns:1fr 1fr;gap:12px}
+  .grid3{display:grid;grid-template-columns:repeat(3,1fr);gap:12px}
+  .grid4{display:grid;grid-template-columns:repeat(4,1fr);gap:12px}
+  .card{border:1px solid var(--line);border-radius:6px;padding:8px}
+  .card h4{margin:0 0 6px;font-size:12px;color:var(--sub)}
+  .menu{display:grid;grid-template-columns:repeat(4,1fr);gap:8px}
+  .menu a{display:block;background:#fff;border:1px solid var(--line);border-radius:6px;padding:14px;text-decoration:none;color:var(--ink);text-align:center;font-weight:600}
+  .menu a:hover{border-color:var(--accent);color:var(--accent)}
+  .breadcrumb{font-size:11px;color:var(--sub);margin-bottom:6px}
+  .alert{border-left:4px solid var(--warn);background:#fff7e6;padding:6px 10px;font-size:12px;margin-bottom:8px}
+  .alert.err{border-color:var(--err);background:#fdecea}
+  .note{background:#eef6ff;border:1px dashed #b6cdea;color:#234;padding:6px 10px;border-radius:4px;font-size:11px;margin-bottom:8px}
+  .preview{aspect-ratio:1/1.414;background:#fff;border:1px solid var(--line);padding:20px;font-size:11px;color:#333;line-height:1.6}
+  .stage{display:flex;gap:6px;font-size:11px;margin-bottom:8px}
+  .stage span{padding:3px 10px;border:1px solid var(--line);border-radius:14px;background:#fff;color:var(--sub)}
+  .stage span.active{background:var(--accent);color:#fff;border-color:var(--accent)}
+  .stage span.done{background:#e6f4ea;color:var(--ok);border-color:#c8e6c9}
+  .lock{font-size:11px;color:var(--err)}
+  details summary{cursor:pointer;font-size:11px;color:var(--sub);margin-top:6px}
+  .ascii{font-family:ui-monospace,Consolas,monospace;white-space:pre;font-size:11px;background:#fafbfd;border:1px solid var(--line);padding:8px;border-radius:4px;overflow:auto}
+  footer{color:var(--sub);font-size:11px;text-align:center;padding:24px}
+</style>
+</head>
+<body>
+<header class="app">
+  <h1>住民記録システム Web版 ワイヤーフレーム（v0.1 / ChromeOS Flex対応）</h1>
+  <nav>
+    <a href="#scr-001">ログイン</a><a href="#scr-002">メニュー</a>
+    <a href="#scr-201">住民検索</a><a href="#scr-101">住民票</a>
+    <a href="#scr-411">転入</a><a href="#scr-412">転出</a>
+    <a href="#scr-421">職権</a><a href="#scr-501">証明発行</a>
+    <a href="#scr-301">抑止</a><a href="#scr-601">統計</a>
+    <a href="#scr-603">EUC</a><a href="#scr-A02">権限</a>
+    <a href="#scr-203">監査ログ</a>
+  </nav>
+</header>
+
+<div class="toc">
+  <h2>収録画面</h2>
+  <ol>
+    <li>SCR-001 ログイン</li>
+    <li>SCR-002 メインメニュー</li>
+    <li>SCR-201 住民検索</li>
+    <li>SCR-101 住民票（個別表示・編集）</li>
+    <li>SCR-102 異動履歴 / 時点照会</li>
+    <li>SCR-411 転入届</li>
+    <li>SCR-412 転出届</li>
+    <li>SCR-421 職権異動（起票→決裁→反映）</li>
+    <li>SCR-501 証明書発行（住民票の写し）</li>
+    <li>SCR-301 抑止設定（DV等支援措置）</li>
+    <li>SCR-601 住基年報</li>
+    <li>SCR-603 EUC（任意抽出）</li>
+    <li>SCR-A02 権限・ロール管理</li>
+    <li>SCR-203 監査ログ参照</li>
+  </ol>
+</div>
+
+<main>
+
+<!-- ========== SCR-001 ログイン ========== -->
+<section class="screen" id="scr-001">
+  <header><span class="id">SCR-001</span><h3>ログイン</h3><span class="api">POST /auth/login</span></header>
+  <div class="body" style="display:flex;justify-content:center">
+    <div style="width:360px">
+      <div class="note">ChromeOS Flex 想定：ID/PW + 2FA、もしくは WebAuthn（FIDO2）/ クライアント証明書（ICカード）</div>
+      <div class="field"><label>職員ID</label><input class="input"></div>
+      <div class="field" style="margin-top:6px"><label>パスワード</label><input class="input" type="password"></div>
+      <div class="field" style="margin-top:6px"><label>所属（任意）</label><select class="select"><option>住民課 窓口係</option></select></div>
+      <div style="display:flex;gap:6px;margin-top:10px">
+        <button class="btn">ログイン</button>
+        <button class="btn sec">WebAuthnでログイン</button>
+        <button class="btn sec">ICカード</button>
+      </div>
+      <div style="font-size:11px;color:var(--sub);margin-top:8px">推奨ブラウザ：Chromium最新2世代（ChromeOS Flex/Chrome/Edge）</div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SCR-002 メインメニュー ========== -->
+<section class="screen" id="scr-002">
+  <header><span class="id">SCR-002</span><h3>メインメニュー（ロール別）</h3><span class="api">GET /me</span></header>
+  <div class="body">
+    <div class="breadcrumb">ようこそ ○○課 山田 太郎 さん（窓口担当 / 証明発行）　最終ログイン: 2026-05-15 17:02</div>
+    <div class="menu">
+      <a href="#scr-201">住民検索</a>
+      <a href="#scr-101">住民票</a>
+      <a href="#scr-102">異動履歴</a>
+      <a href="#scr-411">届出（異動）</a>
+      <a href="#scr-421">職権異動</a>
+      <a href="#scr-501">証明発行</a>
+      <a href="#scr-301">抑止設定</a>
+      <a href="#scr-601">統計・年報</a>
+      <a href="#scr-603">EUC</a>
+      <a href="#scr-A02">権限管理</a>
+      <a href="#scr-203">監査ログ</a>
+      <a href="#scr-001">ログアウト</a>
+    </div>
+    <div class="note" style="margin-top:10px">⚙ メニュー構成はロールに応じて非表示制御（10.3 / 10.4 準拠）</div>
+  </div>
+</section>
+
+<!-- ========== SCR-201 住民検索 ========== -->
+<section class="screen" id="scr-201">
+  <header><span class="id">SCR-201</span><h3>住民検索</h3><span class="api">POST /residents/search</span></header>
+  <div class="body">
+    <div class="row">
+      <div class="field grow"><label>氏名（漢字・カナ・あいまい可）</label><input class="input"></div>
+      <div class="field"><label>生年月日</label><input class="input" type="date"></div>
+      <div class="field"><label>性別</label><select class="select"><option>—</option><option>男</option><option>女</option></select></div>
+      <div class="field"><label>宛名番号</label><input class="input"></div>
+      <div class="field"><label>住民票コード</label><input class="input"></div>
+      <div class="field"><label>個人番号</label><input class="input"><span class="lock">🔒 権限要</span></div>
+    </div>
+    <div class="row">
+      <div class="field grow"><label>住所（部分一致）</label><input class="input"></div>
+      <div class="field"><label>世帯主のみ</label><select class="select"><option>—</option><option>はい</option></select></div>
+      <div class="field"><label>外国人のみ</label><select class="select"><option>—</option><option>はい</option></select></div>
+      <div class="field"><label>除票含む</label><select class="select"><option>含まない</option><option>含む</option></select></div>
+      <div><button class="btn">検索</button> <button class="btn sec">クリア</button></div>
+    </div>
+    <table class="t">
+      <thead><tr><th>選択</th><th>宛名番号</th><th>氏名</th><th>生年月日</th><th>住所</th><th>世帯主</th><th>状態</th><th>抑止</th></tr></thead>
+      <tbody>
+        <tr><td><input type="radio"></td><td>0000123456</td><td>住民 太郎</td><td>1985-04-01</td><td>○○市△△町1-2-3</td><td>本人</td><td>現住</td><td></td></tr>
+        <tr><td><input type="radio"></td><td>0000123457</td><td>住民 花子</td><td>1988-09-12</td><td>○○市△△町1-2-3</td><td>—</td><td>現住</td><td><span class="chip warn">DV支援</span></td></tr>
+        <tr><td><input type="radio"></td><td>0000124000</td><td>外国人 ABCD</td><td>1990-01-15</td><td>○○市□□町5-6</td><td>本人</td><td>現住</td><td></td></tr>
+      </tbody>
+    </table>
+    <div style="margin-top:8px;display:flex;gap:6px"><button class="btn">住民票を開く</button><button class="btn sec">世帯員一覧</button><button class="btn sec">CSV出力</button></div>
+    <div class="alert">🔒 個人番号・住民票コード・支援措置対象者の住所は権限により非表示。CSV出力時はマスク。</div>
+  </div>
+</section>
+
+<!-- ========== SCR-101 住民票 ========== -->
+<section class="screen" id="scr-101">
+  <header><span class="id">SCR-101</span><h3>住民票（個別表示・編集）</h3><span class="api">GET/PUT /residents/{id}</span></header>
+  <div class="body">
+    <div class="breadcrumb">住民検索 ＞ 住民票（宛名番号: 0000123456）</div>
+    <div class="grid3">
+      <div class="card">
+        <h4>基本情報</h4>
+        <table class="t">
+          <tr><th>宛名番号</th><td>0000123456</td></tr>
+          <tr><th>氏名</th><td>住民 太郎 / ジュウミン タロウ</td></tr>
+          <tr><th>生年月日</th><td>1985-04-01 (40歳)</td></tr>
+          <tr><th>性別</th><td>男</td></tr>
+          <tr><th>個人番号</th><td>**** **** ****  <a href="#">表示</a> 🔒</td></tr>
+          <tr><th>住民票コード</th><td>**** **** ***  <a href="#">表示</a> 🔒</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h4>住所・世帯</h4>
+        <table class="t">
+          <tr><th>住所</th><td>○○市△△町1-2-3</td></tr>
+          <tr><th>住定日</th><td>2018-06-01</td></tr>
+          <tr><th>世帯ID</th><td>H-00045</td></tr>
+          <tr><th>世帯主</th><td>本人</td></tr>
+          <tr><th>続柄</th><td>—</td></tr>
+        </table>
+      </div>
+      <div class="card">
+        <h4>状態・特記</h4>
+        <table class="t">
+          <tr><th>状態</th><td><span class="chip ok">現住</span></td></tr>
+          <tr><th>通称</th><td>—</td></tr>
+          <tr><th>旧氏</th><td>—</td></tr>
+          <tr><th>外国人区分</th><td>日本人</td></tr>
+          <tr><th>抑止</th><td>なし</td></tr>
+          <tr><th>本人通知</th><td>登録あり</td></tr>
+        </table>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:10px">
+      <h4>世帯員</h4>
+      <table class="t">
+        <tr><th>宛名</th><th>氏名</th><th>続柄</th><th>生年月日</th><th>個人番号</th><th>住民票コード</th></tr>
+        <tr><td>0000123456</td><td>住民 太郎</td><td>世帯主</td><td>1985-04-01</td><td>🔒</td><td>🔒</td></tr>
+        <tr><td>0000123457</td><td>住民 花子</td><td>妻</td><td>1988-09-12</td><td>🔒</td><td>🔒</td></tr>
+        <tr><td>0000123458</td><td>住民 一郎</td><td>子</td><td>2015-03-20</td><td>🔒</td><td>🔒</td></tr>
+      </table>
+    </div>
+
+    <div style="margin-top:10px;display:flex;gap:6px;flex-wrap:wrap">
+      <button class="btn">編集</button>
+      <a class="btn sec" href="#scr-102">異動履歴 ▶</a>
+      <a class="btn sec" href="#scr-411">転入届</a>
+      <a class="btn sec" href="#scr-412">転出届</a>
+      <a class="btn sec" href="#scr-421">職権異動</a>
+      <a class="btn sec" href="#scr-501">証明発行 ▶</a>
+      <a class="btn sec" href="#scr-301">抑止設定</a>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SCR-102 異動履歴 ========== -->
+<section class="screen" id="scr-102">
+  <header><span class="id">SCR-102</span><h3>異動履歴 / 時点照会</h3><span class="api">GET /residents/{id}/history?asOf=</span></header>
+  <div class="body">
+    <div class="row">
+      <div class="field"><label>時点指定（asOf）</label><input class="input" type="date" value="2024-04-01"></div>
+      <button class="btn">この時点で表示</button>
+      <div class="field"><label>絞り込み</label><select class="select"><option>すべて</option><option>届出のみ</option><option>職権のみ</option></select></div>
+    </div>
+    <table class="t">
+      <thead><tr><th>異動日</th><th>処理日</th><th>区分</th><th>事由</th><th>変更前→変更後（要約）</th><th>担当</th><th>取消</th></tr></thead>
+      <tbody>
+        <tr><td>2026-04-01</td><td>2026-04-01</td><td>届出</td><td>転居</td><td>住所: ○○市△△1-1 → △△1-2-3</td><td>山田</td><td>—</td></tr>
+        <tr><td>2024-05-12</td><td>2024-05-12</td><td>届出</td><td>世帯変更</td><td>世帯ID: H-00040 → H-00045</td><td>佐藤</td><td>—</td></tr>
+        <tr><td>2018-06-01</td><td>2018-06-02</td><td>届出</td><td>転入</td><td>前住所: 他市 → 本市</td><td>鈴木</td><td>—</td></tr>
+      </tbody>
+    </table>
+    <details><summary>選択行の項目別差分を表示</summary>
+      <table class="t" style="margin-top:6px">
+        <tr><th>項目</th><th>変更前</th><th>変更後</th></tr>
+        <tr><td>住所コード</td><td>13104001001</td><td>13104001023</td></tr>
+        <tr><td>住所表記</td><td>○○市△△町1-1</td><td>○○市△△町1-2-3</td></tr>
+        <tr><td>住定日</td><td>2024-05-12</td><td>2026-04-01</td></tr>
+      </table>
+    </details>
+  </div>
+</section>
+
+<!-- ========== SCR-411 転入届 ========== -->
+<section class="screen" id="scr-411">
+  <header><span class="id">SCR-411</span><h3>転入届</h3><span class="api">POST /transactions/in</span></header>
+  <div class="body">
+    <div class="stage"><span class="done">①受付</span><span class="active">②内容入力</span><span>③確認</span><span>④決裁</span><span>⑤反映</span></div>
+    <div class="grid2">
+      <div class="card"><h4>届出情報</h4>
+        <div class="row"><div class="field"><label>届出年月日</label><input class="input" type="date"></div>
+          <div class="field"><label>異動年月日</label><input class="input" type="date"></div>
+          <div class="field"><label>受付窓口</label><select class="select"><option>本庁住民課</option><option>支所</option></select></div></div>
+        <div class="row"><div class="field grow"><label>届出人</label><input class="input"></div>
+          <div class="field"><label>続柄</label><input class="input"></div></div>
+      </div>
+      <div class="card"><h4>前住所情報（転出証明書等）</h4>
+        <div class="row"><div class="field grow"><label>前住所</label><input class="input"></div></div>
+        <div class="row"><div class="field"><label>転出証明書番号</label><input class="input"></div>
+          <div class="field"><label>転出予定日</label><input class="input" type="date"></div></div>
+        <button class="btn sec">CS連携で取得</button>
+      </div>
+    </div>
+
+    <div class="card" style="margin-top:10px"><h4>転入者（世帯員）</h4>
+      <table class="t">
+        <tr><th>#</th><th>氏名(漢字)</th><th>氏名(カナ)</th><th>続柄</th><th>生年月日</th><th>個人番号</th><th>外国人</th></tr>
+        <tr><td>1</td><td><input class="input"></td><td><input class="input"></td><td><input class="input"></td><td><input class="input" type="date"></td><td><input class="input">🔒</td><td><select class="select"><option>—</option><option>有</option></select></td></tr>
+        <tr><td>2</td><td><input class="input"></td><td><input class="input"></td><td><input class="input"></td><td><input class="input" type="date"></td><td><input class="input">🔒</td><td><select class="select"><option>—</option></select></td></tr>
+      </table>
+      <button class="btn sec" style="margin-top:6px">＋世帯員追加</button>
+    </div>
+
+    <div class="alert">⚠ 個人番号のチェックデジット検証、既存住民との重複チェックを送信時に実施します（標準仕様書 第11章 No.1-2）</div>
+
+    <div style="margin-top:10px;display:flex;gap:6px">
+      <button class="btn sec">一時保存</button>
+      <button class="btn">確認画面へ</button>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SCR-412 転出届 ========== -->
+<section class="screen" id="scr-412">
+  <header><span class="id">SCR-412</span><h3>転出届（→ 転出証明書発行）</h3><span class="api">POST /transactions/out</span></header>
+  <div class="body">
+    <div class="stage"><span class="active">①対象選択</span><span>②転出先入力</span><span>③確認</span><span>④反映＋証明発行</span></div>
+    <div class="grid2">
+      <div class="card"><h4>転出する者</h4>
+        <table class="t">
+          <tr><th>選択</th><th>氏名</th><th>続柄</th></tr>
+          <tr><td><input type="checkbox" checked></td><td>住民 太郎</td><td>世帯主</td></tr>
+          <tr><td><input type="checkbox"></td><td>住民 花子</td><td>妻</td></tr>
+          <tr><td><input type="checkbox"></td><td>住民 一郎</td><td>子</td></tr>
+        </table>
+      </div>
+      <div class="card"><h4>転出先</h4>
+        <div class="field"><label>新住所</label><input class="input"></div>
+        <div class="row"><div class="field"><label>新住所コード</label><input class="input"></div>
+          <div class="field"><label>転出予定日</label><input class="input" type="date"></div></div>
+        <div class="field"><label>転出理由</label><select class="select"><option>就職</option><option>結婚</option><option>その他</option></select></div>
+      </div>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:6px"><button class="btn">確認</button><a class="btn sec" href="#scr-501">転出証明書発行へ</a></div>
+  </div>
+</section>
+
+<!-- ========== SCR-421 職権異動 ========== -->
+<section class="screen" id="scr-421">
+  <header><span class="id">SCR-421</span><h3>職権異動（起票→決裁→反映）</h3><span class="api">POST /transactions/official</span></header>
+  <div class="body">
+    <div class="stage"><span class="done">①起票</span><span class="active">②審査</span><span>③決裁</span><span>④反映</span></div>
+    <div class="card"><h4>起票内容</h4>
+      <div class="row">
+        <div class="field"><label>対象者</label><input class="input" value="住民 太郎 (0000123456)"></div>
+        <div class="field"><label>事由</label><select class="select"><option>職権記載</option><option>職権修正</option><option>職権消除</option></select></div>
+        <div class="field"><label>根拠</label><input class="input" value="法第8条 / 規則第13条"></div>
+      </div>
+      <div class="field"><label>処理内容</label><textarea class="input" style="min-height:60px;height:auto;padding:6px">住民票記載事項のうち、住所表記を町名整理に伴い「△△町1-1」→「△△一丁目1-1」へ修正する</textarea></div>
+    </div>
+    <div class="card" style="margin-top:10px"><h4>添付資料</h4>
+      <ul><li>町名整理告示_2026-03-15.pdf</li><li>調査票_山田.pdf</li></ul>
+      <button class="btn sec">＋ファイル追加</button>
+    </div>
+    <div class="card" style="margin-top:10px"><h4>決裁ルート</h4>
+      <table class="t">
+        <tr><th>順</th><th>役職</th><th>担当者</th><th>状態</th><th>コメント</th></tr>
+        <tr><td>1</td><td>係長</td><td>佐藤</td><td><span class="chip ok">承認</span></td><td>—</td></tr>
+        <tr><td>2</td><td>課長</td><td>鈴木</td><td><span class="chip warn">審査中</span></td><td>—</td></tr>
+        <tr><td>3</td><td>部長</td><td>田中</td><td>未着</td><td>—</td></tr>
+      </table>
+    </div>
+    <div style="margin-top:10px;display:flex;gap:6px"><button class="btn sec">差戻</button><button class="btn">承認</button><button class="btn warn">条件付承認</button><button class="btn danger">却下</button></div>
+  </div>
+</section>
+
+<!-- ========== SCR-501 証明書発行 ========== -->
+<section class="screen" id="scr-501">
+  <header><span class="id">SCR-501</span><h3>証明書発行（住民票の写し等）</h3><span class="api">POST /certificates/jumin</span></header>
+  <div class="body">
+    <div class="grid2">
+      <div class="card"><h4>発行条件</h4>
+        <div class="field"><label>対象</label><select class="select"><option>個人（本人のみ）</option><option>世帯（連記）</option><option>個人＋世帯員（連件）</option></select></div>
+        <div class="field"><label>証明種別</label><select class="select"><option>0010001 住民票の写し（日本人）</option><option>0010001 住民票の写し（外国人）</option><option>0010002 記載事項証明</option><option>0010003 世帯連記</option><option>0010004 除票の写し</option><option>0010007 転出証明書</option></select></div>
+        <div class="row">
+          <div class="field"><label>住民票コード</label><select class="select"><option>非表示</option><option>表示</option></select></div>
+          <div class="field"><label>個人番号</label><select class="select"><option>非表示</option><option>表示</option></select></div>
+          <div class="field"><label>本籍・筆頭者</label><select class="select"><option>非表示</option><option>表示</option></select></div>
+          <div class="field"><label>世帯主・続柄</label><select class="select"><option>表示</option><option>非表示</option></select></div>
+        </div>
+        <div class="row">
+          <div class="field"><label>用途</label><input class="input" value="銀行手続"></div>
+          <div class="field"><label>枚数</label><input class="input" type="number" value="1"></div>
+          <div class="field"><label>手数料</label><input class="input" value="300円"></div>
+        </div>
+        <div class="alert">改ざん防止：発行毎にQR + 検証トークンを付与（GET /verify/{token}）</div>
+        <div style="display:flex;gap:6px"><button class="btn">プレビュー</button><button class="btn warn">発行（印刷）</button><button class="btn sec">コンビニ交付連携</button></div>
+      </div>
+      <div>
+        <div class="preview">
+          <div style="text-align:center;font-weight:bold;font-size:14px">住 民 票 の 写 し</div>
+          <div style="margin-top:14px;border-top:1px solid #999;padding-top:8px">
+            <div>住所：○○市△△町1-2-3</div>
+            <div>世帯主：住民 太郎　続柄：本人</div>
+            <div>氏名：住民 太郎　　　　　　性別：男</div>
+            <div>生年月日：昭和60年4月1日</div>
+            <div>住定日：平成30年6月1日</div>
+            <div>個人番号：（省略）　住民票コード：（省略）</div>
+          </div>
+          <div style="margin-top:24px;text-align:right">
+            令和8年5月16日<br>
+            ○○市⾧　○○ ○○ 印
+          </div>
+          <div style="margin-top:8px;font-family:monospace;text-align:right">■■■ QR ■■■ token: a8f3...</div>
+        </div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SCR-301 抑止設定 ========== -->
+<section class="screen" id="scr-301">
+  <header><span class="id">SCR-301</span><h3>抑止設定（DV等支援措置）</h3><span class="api">POST /restrictions</span></header>
+  <div class="body">
+    <div class="alert err">本画面の操作は「DV等支援措置 解除権限」を持つ職員のみ可能（10.3 項目別操作権限）</div>
+    <div class="grid2">
+      <div class="card"><h4>対象者</h4>
+        <table class="t">
+          <tr><th>宛名番号</th><td>0000123457</td></tr>
+          <tr><th>氏名</th><td>住民 花子</td></tr>
+          <tr><th>現行抑止</th><td><span class="chip warn">DV支援 / 期限 2027-03-31</span></td></tr>
+        </table>
+      </div>
+      <div class="card"><h4>抑止内容</h4>
+        <div class="field"><label>区分</label><select class="select"><option>DV等支援措置</option><option>ストーカー</option><option>児童虐待</option></select></div>
+        <div class="row">
+          <div class="field"><label>開始日</label><input class="input" type="date"></div>
+          <div class="field"><label>終了日</label><input class="input" type="date"></div>
+        </div>
+        <div class="field"><label>適用範囲</label>
+          <select class="select"><option>本人＋同一世帯員すべて</option><option>本人のみ</option></select>
+        </div>
+        <div class="field"><label>解除可能ロール</label><select class="select"><option>抑止解除権限のみ</option></select></div>
+        <div style="display:flex;gap:6px;margin-top:6px"><button class="btn">登録</button><button class="btn danger">解除</button></div>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SCR-601 住基年報 ========== -->
+<section class="screen" id="scr-601">
+  <header><span class="id">SCR-601</span><h3>住基年報・人口動態</h3><span class="api">POST /reports/annual</span></header>
+  <div class="body">
+    <div class="row">
+      <div class="field"><label>対象年度</label><select class="select"><option>令和7年度</option><option>令和8年度</option></select></div>
+      <div class="field"><label>様式</label><select class="select"><option>20.6 全様式</option><option>人口動態（月次）</option></select></div>
+      <div class="field"><label>出力形式</label><select class="select"><option>Excel</option><option>PDF</option></select></div>
+      <button class="btn">集計実行</button>
+    </div>
+    <div class="card">
+      <h4>進捗</h4>
+      <table class="t">
+        <tr><th>様式</th><th>件数</th><th>状態</th></tr>
+        <tr><td>第1表 男女別人口</td><td>—</td><td><span class="chip ok">完了</span></td></tr>
+        <tr><td>第2表 世帯数</td><td>—</td><td><span class="chip ok">完了</span></td></tr>
+        <tr><td>第3表 異動者数</td><td>—</td><td><span class="chip warn">実行中 62%</span></td></tr>
+      </table>
+      <button class="btn sec" style="margin-top:6px">ダウンロード</button>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SCR-603 EUC ========== -->
+<section class="screen" id="scr-603">
+  <header><span class="id">SCR-603</span><h3>EUC（任意抽出）</h3><span class="api">POST /euc/query</span></header>
+  <div class="body">
+    <div class="alert">⚠ 個人番号が出力対象に含まれる場合、追加承認とパスワード付ZIP配信が必須（標準仕様書 10.1）</div>
+    <div class="grid2">
+      <div class="card"><h4>クエリ条件</h4>
+        <div class="field"><label>テンプレ</label><select class="select"><option>—</option><option>年齢到達者</option><option>住所変更履歴</option></select></div>
+        <div class="field"><label>抽出条件</label>
+          <textarea class="input" style="min-height:80px;height:auto;padding:6px">age &gt;= 18 AND moved_in_date BETWEEN '2025-04-01' AND '2026-03-31'</textarea>
+        </div>
+        <div class="field"><label>出力項目</label>
+          <select class="select" multiple style="height:auto"><option selected>宛名番号</option><option selected>氏名</option><option selected>住所</option><option>個人番号 🔒</option></select>
+        </div>
+      </div>
+      <div class="card"><h4>結果プレビュー（上位10件）</h4>
+        <table class="t">
+          <tr><th>宛名</th><th>氏名</th><th>住所</th></tr>
+          <tr><td>0000123456</td><td>住民 太郎</td><td>○○市△△町1-2-3</td></tr>
+          <tr><td>0000123500</td><td>市民 次郎</td><td>○○市□□町2-3</td></tr>
+        </table>
+      </div>
+    </div>
+    <div style="display:flex;gap:6px;margin-top:8px"><button class="btn">CSVダウンロード</button><button class="btn sec">テンプレ保存</button></div>
+  </div>
+</section>
+
+<!-- ========== SCR-A02 権限管理 ========== -->
+<section class="screen" id="scr-A02">
+  <header><span class="id">SCR-A02</span><h3>権限・ロール管理</h3><span class="api">POST /roles / POST /permissions</span></header>
+  <div class="body">
+    <div class="grid2">
+      <div class="card"><h4>ロール</h4>
+        <table class="t">
+          <tr><th>選択</th><th>ロール</th><th>人数</th></tr>
+          <tr><td><input type="radio" checked></td><td>窓口担当</td><td>32</td></tr>
+          <tr><td><input type="radio"></td><td>異動審査</td><td>8</td></tr>
+          <tr><td><input type="radio"></td><td>抑止解除権限</td><td>3</td></tr>
+          <tr><td><input type="radio"></td><td>システム管理者</td><td>2</td></tr>
+        </table>
+      </div>
+      <div class="card"><h4>権限マトリクス（窓口担当）</h4>
+        <table class="t">
+          <tr><th>機能</th><th>参照</th><th>編集</th><th>承認</th><th>項目マスク</th></tr>
+          <tr><td>住民データ</td><td>✓</td><td>—</td><td>—</td><td>個人番号/コード</td></tr>
+          <tr><td>異動</td><td>✓</td><td>受付のみ</td><td>—</td><td>—</td></tr>
+          <tr><td>証明発行</td><td>✓</td><td>✓</td><td>—</td><td>—</td></tr>
+          <tr><td>抑止対象者</td><td>—</td><td>—</td><td>—</td><td>全項目</td></tr>
+        </table>
+        <button class="btn" style="margin-top:6px">編集</button>
+      </div>
+    </div>
+  </div>
+</section>
+
+<!-- ========== SCR-203 監査ログ ========== -->
+<section class="screen" id="scr-203">
+  <header><span class="id">SCR-203</span><h3>監査ログ参照</h3><span class="api">GET /audit</span></header>
+  <div class="body">
+    <div class="row">
+      <div class="field"><label>期間From</label><input class="input" type="date"></div>
+      <div class="field"><label>期間To</label><input class="input" type="date"></div>
+      <div class="field"><label>職員</label><input class="input"></div>
+      <div class="field"><label>対象住民</label><input class="input"></div>
+      <div class="field"><label>操作</label><select class="select"><option>すべて</option><option>参照</option><option>更新</option><option>発行</option></select></div>
+      <button class="btn">検索</button>
+    </div>
+    <table class="t">
+      <thead><tr><th>日時</th><th>職員</th><th>IP</th><th>操作</th><th>対象</th><th>結果</th></tr></thead>
+      <tbody>
+        <tr><td>2026-05-15 14:23</td><td>山田</td><td>10.1.2.3</td><td>住民票参照</td><td>0000123456</td><td>OK</td></tr>
+        <tr><td>2026-05-15 14:25</td><td>山田</td><td>10.1.2.3</td><td>証明発行</td><td>0000123456 / 0010001</td><td>OK</td></tr>
+        <tr><td>2026-05-15 15:01</td><td>佐藤</td><td>10.1.2.7</td><td>抑止解除</td><td>0000123457</td><td>OK</td></tr>
+      </tbody>
+    </table>
+    <div class="alert">監査ログは7年保持／WORMストレージへ自動アーカイブ</div>
+  </div>
+</section>
+
+</main>
+<footer>
+  © 自治体システム等標準化検討会 標準仕様書（住民記録システム 第6.1版）準拠 ／ Web版設計 v0.1 ／ ChromeOS Flex対応
+</footer>
+</body>
+</html>
