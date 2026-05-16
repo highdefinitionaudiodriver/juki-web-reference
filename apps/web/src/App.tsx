@@ -1,5 +1,6 @@
 import { useCallback, useEffect, useMemo, useState } from "react";
 import { api } from "./api";
+import { completeOidcLoginFromRedirect, logout, startOidcLogin } from "./auth";
 import type {
   AuditLog,
   Me,
@@ -59,6 +60,7 @@ export function App() {
 
   useEffect(() => {
     (async () => {
+      await completeOidcLoginFromRedirect();
       setMe(await api.me());
       const result = await api.searchResidents({});
       setResidents(result.items ?? []);
@@ -88,6 +90,14 @@ export function App() {
       subtitle={subtitle}
       notice={notice}
       onChangeView={setView}
+      onLoginOidc={() => {
+        startOidcLogin().catch((e) => setNotice({ kind: "err", message: String(e) }));
+      }}
+      onLogout={() => {
+        logout();
+        setMe(null);
+        setNotice({ kind: "info", message: "ログアウトしました。" });
+      }}
     >
       {view === "search" && (
         <SearchView

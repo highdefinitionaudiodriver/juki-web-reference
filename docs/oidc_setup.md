@@ -55,10 +55,45 @@ Spring 起動時に `/realms/juki/.well-known/openid-configuration` を取得し
 ID Token を検証します。`JwtAuthenticationConverter` が `roles` claim を `ROLE_*` に展開する
 ので、`@PreAuthorize("hasRole('ADMIN')")` 等がそのまま効きます。
 
-## 4. Web 側からのログイン
+## 4. Web 側からのログイン（Authorization Code + PKCE）
 
-現状 `apps/web/src/auth.ts` は dev IdP（apps/api の HS256 JWT）に直接ログインする実装です。
-本番 Keycloak と連携するには **Authorization Code Flow + PKCE** に書き換えが必要です。
+`apps/web/src/auth.ts` は Authorization Code Flow + PKCE に対応済みです。
+Web 画面左下の `OIDC` ボタンを押すと Keycloak のログイン画面へ遷移し、
+戻りの `code/state` を検証して access token を保存します。以後の API 呼び出しは
+`Authorization: Bearer <access_token>` を自動付与します。
+
+### Vite dev server で確認
+
+```powershell
+$env:VITE_OIDC_ISSUER = "http://localhost:8080/realms/juki"
+$env:VITE_OIDC_CLIENT_ID = "juki-web"
+npm run web:dev
+```
+
+ブラウザで http://localhost:5173 を開き、`OIDC` ボタンからログインします。
+
+### Node 一体配信で確認
+
+```powershell
+$env:VITE_OIDC_ISSUER = "http://localhost:8080/realms/juki"
+$env:VITE_OIDC_CLIENT_ID = "juki-web"
+npm run web:build
+npm run api:dev
+```
+
+ブラウザで http://localhost:8787 を開き、`OIDC` ボタンからログインします。
+
+### 設定キー
+
+| 環境変数 | 既定値 | 説明 |
+|---|---|---|
+| `VITE_OIDC_ISSUER` | `http://localhost:8080/realms/juki` | Keycloak realm issuer |
+| `VITE_OIDC_CLIENT_ID` | `juki-web` | public client ID |
+| `VITE_OIDC_REDIRECT_URI` | 現在の origin + path | redirect URI |
+| `VITE_OIDC_SCOPE` | `openid profile email` | 要求 scope |
+| `VITE_OIDC_LOGOUT` | 未設定 | `true` の場合、logout 時に Keycloak end_session へ遷移 |
+
+### curl での疎通確認
 
 簡易方式（dev）：`docker compose up -d` 後に curl で password grant トークンを取得：
 

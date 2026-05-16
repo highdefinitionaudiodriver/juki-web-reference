@@ -8,10 +8,12 @@ type Props = {
   subtitle: string;
   notice: { kind: "info" | "err"; message: string } | null;
   onChangeView: (view: ViewId) => void;
+  onLoginOidc: () => void;
+  onLogout: () => void;
   children: React.ReactNode;
 };
 
-export function Shell({ me, nav, view, title, subtitle, notice, onChangeView, children }: Props) {
+export function Shell({ me, nav, view, title, subtitle, notice, onChangeView, onLoginOidc, onLogout, children }: Props) {
   return (
     <div className="shell">
       <aside className="side">
@@ -32,6 +34,10 @@ export function Shell({ me, nav, view, title, subtitle, notice, onChangeView, ch
         <div className="operator">
           <span>{me?.department ?? ""}</span>
           <strong>{me?.fullName ?? ""}</strong>
+          <div className="auth-actions">
+            <button onClick={onLoginOidc}>OIDC</button>
+            <button onClick={onLogout}>Logout</button>
+          </div>
         </div>
       </aside>
       <main className="main">

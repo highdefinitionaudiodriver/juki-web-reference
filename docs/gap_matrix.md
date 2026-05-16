@@ -1,6 +1,6 @@
 # 設計 vs 現状実装 ギャップマトリクス
 
-最終更新: 2026-05-16  
+最終更新: 2026-05-17  
 比較対象:
 - **設計**: `住民記録システム_Web版_設計書.xlsx` / `c_openapi.yaml` (40 path / 29 schema) / `b_er_diagram.html` (22 table) / `a_wireframes.html` (13 screen)
 - **実装**: React 19 SPA (`apps/web`) + Node 開発 API (`apps/api`) + Spring Boot 3 (`apps/api-spring`) + Flyway PostgreSQL 16 + OpenHTMLtoPDF
@@ -15,7 +15,7 @@
 | 機能 (F-ID) | 約38 | 約15 | **39%** |
 | 帳票 (00100xx) | 19 + 年報 | 0010001 / 0010007 (HTML→PDF), 0010002–5 は form_id 出し分け | **30%** |
 | 連携 (IF-ID) | 9 | 0（スケルトン） | **0%** |
-| 認証 | OIDC + 2FA / WebAuthn / mTLS | OIDC リソースサーバ + Keycloak dev IdP コンテナ + dev HS256 | **60%** |
+| 認証 | OIDC + 2FA / WebAuthn / mTLS | OIDC リソースサーバ + Keycloak dev IdP + Web PKCE + dev HS256 | **75%** |
 | 権限・抑止 | ロール ×項目別マスク／DV 隠蔽 | 完全実装 (`MaskService` / WINDOW から DV 対象は 404) | **100%** |
 | 履歴 (SCD-2) | resident_history.snapshot | `ResidentHistoryRepository` + `HistoryWriter` (AFTER_COMMIT) | **80%** |
 | 監査ログ | 全操作 7年 / WORM | `audit_log` テーブル + Node メモリ | **40%** |
@@ -92,10 +92,10 @@
 ### A. 機能拡張
 1. 残り帳票 (0010002–0010019, 年報) を `CertificatePdfService` の form_id ごとにレイアウト
 2. 連携 9 系統のうち、税 / 国保 / 選挙 / コンビニ / マイナポータルの業務別ペイロード反映
-3. Keycloak Authorization Code + PKCE ログイン
+3. Keycloak と Spring の実接続テスト
 
 ### B. 非機能
-1. Keycloak と Spring の実接続テスト（Authorization Code + PKCE）
+1. Keycloak と Spring の実接続テスト（実 JWT 検証）
 2. PDF/A-2b 準拠の Linux Docker イメージビルド（`fonts-noto-cjk` 同梱）
 3. アクセシビリティ JIS X 8341-3 AA を `axe-core` で自動チェック
 4. OWASP ASVS Lv2 セルフチェック
