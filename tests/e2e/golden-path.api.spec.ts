@@ -326,3 +326,75 @@ test("職権異動: 起票から承認まで", async ({ request }) => {
   const approvedJson = await approved.json();
   expect(approvedJson.status).toBe("APPLIED");
 });
+
+test("CS 連携: 4情報照合 MATCH / MISMATCH / 不在 404", async ({ request }) => {
+  const reviewHeaders = headers(["REVIEW", "ADMIN"]);
+
+  // MATCH: seed の 0000123456 の生年月日と性別が一致（住所/氏名は seed と
+  // 半角/全角スペースが揺らぐため判定に含めない）
+  const match = await request.post("/api/v1/link/cs/inbound", {
+    headers: reviewHeaders,
+    data: {
+      residentId: "0000123456",
+      fourInfo: { birthDate: "1985-04-01", sex: "M" },
+    },
+  });
+  expect(match.status()).toBe(200);
+  const mJson = await match.json();
+  expect(mJson.status).toBe("MATCH");
+  expect(mJson.matched).toBe(true);
+
+  // MISMATCH: 性別違い
+  const mismatch = await request.post("/api/v1/link/cs/inbound", {
+    headers: reviewHeaders,
+    data: { residentId: "0000123456", fourInfo: { sex: "F" } },
+  });
+  expect(mismatch.status()).toBe(200);
+  const xJson = await mismatch.json();
+  expect(xJson.status).toBe("MISMATCH");
+  expect(xJson.differences).toContain("sex");
+
+  // 不在 404
+  const nf = await request.post("/api/v1/link/cs/inbound", {
+    headers: reviewHeaders,
+    data: { residentId: "ZZZ", fourInfo: { name: "X" } },
+  });
+  expect(nf.status()).toBe(404);
+});
+
+test("庁内連携 TAX: 住民データ提供 + residentIds 必須", async ({ request }) => {
+  const reviewHeaders = headers(["REVIEW", "ADMIN"]);
+
+  // 必須欠落 400
+  const bad = await request.post("/api/v1/link/internal/tax", {
+    headers: reviewHeaders,
+    data: {},
+  });
+  expect(bad.status()).toBe(400);
+
+  // 正常: 1 件返却
+  const ok = await request.post("/api/v1/link/internal/tax", {
+    headers: reviewHeaders,
+    data: { residentIds: ["0000123456"] },
+  });
+  expect(ok.status()).toBe(200);
+  const okJson = await ok.json();
+  expect(okJson.partnerId).toBe("TAX");
+  expect(okJson.status).toBe("APPLIED");
+  expect(okJson.count).toBe(1);
+  expect(okJson.residents[0].residentId).toBe("0000123456");
+  // 個人番号・住民票コードは漏らさない
+  expect(okJson.residents[0].myNumber).toBeUndefined();
+  expect(okJson.residents[0].juminCode).toBeUndefined();
+});
+
+test("番号連携 LOOKUP: residentId に対し 4情報を返す", async ({ request }) => {
+  const res = await request.post("/api/v1/link/number/inbound", {
+    headers: headers(["ADMIN"]),
+    data: { operation: "LOOKUP", residentId: "0000123456" },
+  });
+  expect(res.status()).toBe(200);
+  const j = await res.json();
+  expect(j.operation).toBe("LOOKUP");
+  expect(j.data.residentId).toBe("0000123456");
+});

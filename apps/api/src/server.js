@@ -709,21 +709,103 @@ async function handleApi(req, res, reqUrl) {
     });
   }
 
-  const linkMatch = path.match(/^\/link\/(?:cs|number|application)\/inbound$/) || path.match(/^\/link\/internal\/([^/]+)$/);
-  if (req.method === "POST" && linkMatch) {
+  // CS 連携: residentId + fourInfo を受領し、整合を返す
+  if (req.method === "POST" && path === "/link/cs/inbound") {
     const body = await readBody(req);
-    const partnerId = path.includes("/cs/") ? "CS"
-      : path.includes("/number/") ? "NUMBER"
-      : path.includes("/application/") ? "APPLICATION"
-      : String(linkMatch[1] || "").toUpperCase();
+    if (!body?.residentId) {
+      const event = acceptLinkEvent("CS", body, "ACCEPTED", null);
+      return json(res, 202, { eventId: String(event.eventId), partnerId: "CS", status: "ACCEPTED", receivedAt: event.receivedAt });
+    }
+    const r = state.residents.find((x) => x.residentId === body.residentId);
+    if (!r) {
+      const event = acceptLinkEvent("CS", body, "NOT_FOUND", null);
+      return json(res, 404, { eventId: String(event.eventId), partnerId: "CS", status: "NOT_FOUND", receivedAt: event.receivedAt });
+    }
+    const fi = body.fourInfo || {};
+    const diffs = [];
+    const here = `${r.familyNameKanji ?? ""} ${r.givenNameKanji ?? ""}`;
+    if (fi.name && fi.name !== here) diffs.push("name");
+    if (fi.birthDate && fi.birthDate !== r.birthDate) diffs.push("birthDate");
+    if (fi.sex && fi.sex !== r.sex) diffs.push("sex");
+    if (fi.addressText && fi.addressText !== r.addressText) diffs.push("addressText");
+    const status = diffs.length === 0 ? "MATCH" : "MISMATCH";
+    const event = acceptLinkEvent("CS", body, status, null);
+    audit(user, "RECEIVE", "LINK_CS", String(event.eventId), { residentId: body.residentId, status });
+    return json(res, 200, {
+      eventId: String(event.eventId), partnerId: "CS", status,
+      matched: diffs.length === 0, differences: diffs, receivedAt: event.receivedAt,
+    });
+  }
+
+  // 番号連携: operation 分岐 (ISSUE_LINK / LOOKUP)
+  if (req.method === "POST" && path === "/link/number/inbound") {
+    const body = await readBody(req);
+    const op = String(body?.operation || "ACCEPT").toUpperCase();
+    if (op === "ISSUE_LINK") {
+      const event = acceptLinkEvent("NUMBER", body, "APPLIED", null);
+      return json(res, 200, {
+        eventId: String(event.eventId), partnerId: "NUMBER", status: "APPLIED",
+        operation: op, symbol: `SYM-${Date.now()}`, receivedAt: event.receivedAt,
+      });
+    }
+    if (op === "LOOKUP") {
+      const r = state.residents.find((x) => x.residentId === body?.residentId);
+      if (!r) {
+        const event = acceptLinkEvent("NUMBER", body, "NOT_FOUND", null);
+        return json(res, 404, { eventId: String(event.eventId), partnerId: "NUMBER", status: "NOT_FOUND", receivedAt: event.receivedAt });
+      }
+      const event = acceptLinkEvent("NUMBER", body, "APPLIED", null);
+      return json(res, 200, {
+        eventId: String(event.eventId), partnerId: "NUMBER", status: "APPLIED",
+        operation: op,
+        data: {
+          residentId: r.residentId,
+          name: `${r.familyNameKanji ?? ""} ${r.givenNameKanji ?? ""}`,
+          birthDate: r.birthDate, sex: r.sex, addressText: r.addressText, householdId: r.householdId,
+        },
+        receivedAt: event.receivedAt,
+      });
+    }
+    const event = acceptLinkEvent("NUMBER", body, "ACCEPTED", null);
+    return json(res, 202, { eventId: String(event.eventId), partnerId: "NUMBER", status: "ACCEPTED", receivedAt: event.receivedAt });
+  }
+
+  // 庁内他業務: TAX / INSURANCE / ELECTION は 4情報相当を返す
+  const internalMatch = path.match(/^\/link\/internal\/([^/]+)$/);
+  if (req.method === "POST" && internalMatch) {
+    const partnerId = String(internalMatch[1] || "").toUpperCase();
+    const body = await readBody(req);
+    if (["TAX", "INSURANCE", "ELECTION"].includes(partnerId)) {
+      const ids = Array.isArray(body?.residentIds) ? body.residentIds : [];
+      if (ids.length === 0) {
+        return json(res, 400, { code: "VALIDATION_ERROR", message: "residentIds は必須です（空配列不可）。" });
+      }
+      const records = ids
+        .map((rid) => state.residents.find((r) => r.residentId === rid))
+        .filter(Boolean)
+        .map((r) => ({
+          residentId: r.residentId,
+          name: `${r.familyNameKanji ?? ""} ${r.givenNameKanji ?? ""}`,
+          birthDate: r.birthDate, sex: r.sex, addressText: r.addressText, householdId: r.householdId,
+        }));
+      const event = acceptLinkEvent(partnerId, body, "APPLIED", null);
+      audit(user, "PROVIDE", "LINK", String(event.eventId), { partnerId, count: records.length });
+      return json(res, 200, {
+        eventId: String(event.eventId), partnerId, status: "APPLIED",
+        count: records.length, residents: records, receivedAt: event.receivedAt,
+      });
+    }
     const event = acceptLinkEvent(partnerId, body, "ACCEPTED", null);
     audit(user, "RECEIVE", "LINK", String(event.eventId), { partnerId });
-    return json(res, 202, {
-      eventId: String(event.eventId),
-      partnerId,
-      status: "ACCEPTED",
-      receivedAt: event.receivedAt,
-    });
+    return json(res, 202, { eventId: String(event.eventId), partnerId, status: "ACCEPTED", receivedAt: event.receivedAt });
+  }
+
+  // 申請管理 受領のみ
+  if (req.method === "POST" && path === "/link/application/inbound") {
+    const body = await readBody(req);
+    const event = acceptLinkEvent("APPLICATION", body, "ACCEPTED", null);
+    audit(user, "RECEIVE", "LINK", String(event.eventId), { partnerId: "APPLICATION" });
+    return json(res, 202, { eventId: String(event.eventId), partnerId: "APPLICATION", status: "ACCEPTED", receivedAt: event.receivedAt });
   }
 
   if (req.method === "POST" && path === "/euc/query") {

@@ -96,26 +96,8 @@ public class CertificatePdfService {
             }
         }
 
-        String html = renderTemplate(loadTemplate(), Map.ofEntries(
-            entry("title", titleFor(String.valueOf(issue.get("form_id")))),
-            entry("issueId", String.valueOf(issue.get("issue_id"))),
-            entry("formId", String.valueOf(issue.get("form_id"))),
-            entry("addressText", str(resident.get("address_text"))),
-            entry("householdHead", joinName(head.get("family_name_kanji"), head.get("given_name_kanji"))),
-            entry("name", joinName(resident.get("family_name_kanji"), resident.get("given_name_kanji"))),
-            entry("nameKana", joinName(resident.get("family_name_kana"), resident.get("given_name_kana"))),
-            entry("birthDate", warekiOrIso(resident.get("birth_date"))),
-            entry("sex", sexLabel(resident.get("sex"))),
-            entry("relationToHead", str(resident.get("relation_to_head"))),
-            entry("movedInDate", warekiOrIso(resident.get("moved_in_date"))),
-            entry("myNumber", "****-****-****"),
-            entry("juminCode", "****-****-***"),
-            entry("issueDate", warekiOrIso(issue.get("issued_at"))),
-            entry("municipality", municipality),
-            entry("mayorName", mayorName),
-            entry("usageText", str(issue.get("usage_text"))),
-            entry("verifyToken", String.valueOf(issue.get("verify_token")))
-        ));
+        String formId = String.valueOf(issue.get("form_id"));
+        String html = renderForFormId(formId, issue, resident, head);
 
         ByteArrayOutputStream out = new ByteArrayOutputStream();
         try {
@@ -152,20 +134,174 @@ public class CertificatePdfService {
             case "0010004" -> "住民票の除票の写し";
             case "0010005" -> "住民基本台帳の一部の写し";
             case "0010007" -> "転 出 証 明 書";
+            case "0010008" -> "転出証明書に準ずる証明書";
             case "0010009" -> "住民票コード通知票";
             case "0010010" -> "個人番号通知票";
             case "0010011" -> "住民票コード・個人番号変更通知票";
             case "0010012" -> "在留期間満了事前通知票";
+            case "0010013" -> "通称名変更通知書";
+            case "0010014" -> "通称名変更依頼通知書";
+            case "0010015" -> "住所異動届受理通知";
+            case "0010016" -> "職権処理通知書";
+            case "0010017" -> "成年後見人異動通知";
+            case "0010018" -> "住居表示実施通知書";
+            case "0010019" -> "町名整理に伴う住所変更通知";
             default -> "証明書";
         };
     }
 
-    private String loadTemplate() {
+    /**
+     * form_id 別に最適なテンプレートと変数セットを選び HTML を返す。
+     *
+     * | form_id | テンプレート | 用途 |
+     * |---|---|---|
+     * | 0010001 / 0010002 / 0010003 / 0010004 / 0010005 / 0010007 / 0010008 | certificate-template.html | 住民票/転出証明等の本体帳票 |
+     * | 0010009 / 0010010 / 0010011 / 0010013 / 0010014 / 0010015 / 0010016 / 0010017 / 0010018 / 0010019 | notice-template.html | 各種通知票 |
+     * | 0010012 | foreigner-expiry-template.html | 在留期間満了事前通知（30日前） |
+     */
+    private String renderForFormId(String formId, Map<String, Object> issue,
+                                    Map<String, Object> resident, Map<String, Object> head) {
+        return switch (formId) {
+            case "0010009", "0010010", "0010011" -> renderCodeNotice(formId, issue, resident);
+            case "0010012" -> renderForeignerExpiry(formId, issue, resident);
+            case "0010013", "0010014", "0010015", "0010016", "0010017", "0010018", "0010019" ->
+                renderGenericNotice(formId, issue, resident);
+            default -> renderCertificate(formId, issue, resident, head);
+        };
+    }
+
+    /** 住民票・除票・転出証明・閲覧用 一部の写し等の本体帳票 */
+    private String renderCertificate(String formId, Map<String, Object> issue,
+                                      Map<String, Object> resident, Map<String, Object> head) {
+        return renderTemplate(loadTemplate("certificate-template.html"), Map.ofEntries(
+            entry("title", titleFor(formId)),
+            entry("issueId", String.valueOf(issue.get("issue_id"))),
+            entry("formId", formId),
+            entry("addressText", str(resident.get("address_text"))),
+            entry("householdHead", joinName(head.get("family_name_kanji"), head.get("given_name_kanji"))),
+            entry("name", joinName(resident.get("family_name_kanji"), resident.get("given_name_kanji"))),
+            entry("nameKana", joinName(resident.get("family_name_kana"), resident.get("given_name_kana"))),
+            entry("birthDate", warekiOrIso(resident.get("birth_date"))),
+            entry("sex", sexLabel(resident.get("sex"))),
+            entry("relationToHead", str(resident.get("relation_to_head"))),
+            entry("movedInDate", warekiOrIso(resident.get("moved_in_date"))),
+            entry("myNumber", "****-****-****"),
+            entry("juminCode", "****-****-***"),
+            entry("issueDate", warekiOrIso(issue.get("issued_at"))),
+            entry("municipality", municipality),
+            entry("mayorName", mayorName),
+            entry("usageText", str(issue.get("usage_text"))),
+            entry("verifyToken", String.valueOf(issue.get("verify_token")))
+        ));
+    }
+
+    /** 0010009/0010010/0010011 コード関連通知票 */
+    private String renderCodeNotice(String formId, Map<String, Object> issue, Map<String, Object> resident) {
+        String codeLabel = switch (formId) {
+            case "0010009" -> "住民票コード";
+            case "0010010" -> "個人番号";
+            case "0010011" -> "住民票コード／個人番号";
+            default -> "コード";
+        };
+        String reasonLabel = switch (formId) {
+            case "0010009", "0010010" -> "付番（新規）";
+            case "0010011" -> "変更／修正";
+            default -> "";
+        };
+        // コード本体は通知票では取り扱いに注意。マスク済を提示する設計。
+        // 実運用では送付経路と封緘方針に従い、必要時のみ平文を入れる切替を行う。
+        return renderTemplate(loadTemplate("notice-template.html"), Map.ofEntries(
+            entry("title", titleFor(formId)),
+            entry("formId", formId),
+            entry("noticeNumber", "通知番号: " + str(issue.get("issue_id"))),
+            entry("addresseeLabel", "住所地"),
+            entry("name", joinName(resident.get("family_name_kanji"), resident.get("given_name_kanji"))),
+            entry("leadingText", "下記のとおり、" + codeLabel + "を発行／変更しましたのでお知らせします。"),
+            entry("codeLabel", codeLabel),
+            entry("codeValue", "**** **** ****"),
+            entry("eventDate", warekiOrIso(issue.get("issued_at"))),
+            entry("reasonLabel", reasonLabel),
+            entry("issueDate", warekiOrIso(issue.get("issued_at"))),
+            entry("municipality", municipality),
+            entry("mayorName", mayorName),
+            entry("verifyToken", String.valueOf(issue.get("verify_token")))
+        ));
+    }
+
+    /** 0010012 在留期間満了事前通知 */
+    private String renderForeignerExpiry(String formId, Map<String, Object> issue, Map<String, Object> resident) {
+        // 在留情報を resident_foreigner から取得
+        Map<String, Object> fg = Map.of();
+        Object residentId = resident.get("resident_id") != null ? resident.get("resident_id") : issue.get("resident_id");
+        if (residentId != null) {
+            try {
+                fg = jdbc.queryForMap("""
+                    select residence_status, residence_period_end, nationality_full
+                      from resident_foreigner where resident_id = ?
+                    """, residentId);
+            } catch (EmptyResultDataAccessException ignore) {
+                // 外国人レコードなし
+            }
+        }
+        String residencePeriodEnd = warekiOrIso(fg.get("residence_period_end"));
+        // 残日数の計算（issued_at と residence_period_end の差）
+        String daysUntil = "—";
         try {
-            return StreamUtils.copyToString(new ClassPathResource("certificate-template.html").getInputStream(),
+            LocalDate end = (fg.get("residence_period_end") instanceof java.sql.Date d)
+                ? d.toLocalDate() : null;
+            LocalDate issuedAt = (issue.get("issued_at") instanceof java.sql.Timestamp ts)
+                ? ts.toLocalDateTime().toLocalDate() : LocalDate.now();
+            if (end != null) {
+                long days = java.time.temporal.ChronoUnit.DAYS.between(issuedAt, end);
+                daysUntil = String.valueOf(Math.max(0, days));
+            }
+        } catch (Exception ignore) {
+            // フォールバック
+        }
+        return renderTemplate(loadTemplate("foreigner-expiry-template.html"), Map.ofEntries(
+            entry("title", titleFor(formId)),
+            entry("formId", formId),
+            entry("noticeNumber", "通知番号: " + str(issue.get("issue_id"))),
+            entry("name", joinName(resident.get("family_name_kanji"), resident.get("given_name_kanji"))),
+            entry("nameKana", joinName(resident.get("family_name_kana"), resident.get("given_name_kana"))),
+            entry("addressText", str(resident.get("address_text"))),
+            entry("nationality", str(fg.get("nationality_full"))),
+            entry("residenceStatus", str(fg.get("residence_status"))),
+            entry("residencePeriodEnd", residencePeriodEnd),
+            entry("daysUntilExpiry", daysUntil),
+            entry("issueDate", warekiOrIso(issue.get("issued_at"))),
+            entry("municipality", municipality),
+            entry("mayorName", mayorName),
+            entry("verifyToken", String.valueOf(issue.get("verify_token")))
+        ));
+    }
+
+    /** 0010013-0010019 その他の通知票（暫定） */
+    private String renderGenericNotice(String formId, Map<String, Object> issue, Map<String, Object> resident) {
+        return renderTemplate(loadTemplate("notice-template.html"), Map.ofEntries(
+            entry("title", titleFor(formId)),
+            entry("formId", formId),
+            entry("noticeNumber", "通知番号: " + str(issue.get("issue_id"))),
+            entry("addresseeLabel", "宛先"),
+            entry("name", joinName(resident.get("family_name_kanji"), resident.get("given_name_kanji"))),
+            entry("leadingText", "下記の事務処理が行われましたのでお知らせします。"),
+            entry("codeLabel", "区分"),
+            entry("codeValue", titleFor(formId)),
+            entry("eventDate", warekiOrIso(issue.get("issued_at"))),
+            entry("reasonLabel", str(issue.get("usage_text"))),
+            entry("issueDate", warekiOrIso(issue.get("issued_at"))),
+            entry("municipality", municipality),
+            entry("mayorName", mayorName),
+            entry("verifyToken", String.valueOf(issue.get("verify_token")))
+        ));
+    }
+
+    private String loadTemplate(String classpathResource) {
+        try {
+            return StreamUtils.copyToString(new ClassPathResource(classpathResource).getInputStream(),
                 StandardCharsets.UTF_8);
         } catch (IOException e) {
-            throw new UncheckedIOException("template not found", e);
+            throw new UncheckedIOException("template not found: " + classpathResource, e);
         }
     }
 
