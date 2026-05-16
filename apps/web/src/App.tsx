@@ -12,6 +12,7 @@ import { Shell } from "./components/Shell";
 import { SearchView } from "./views/SearchView";
 import { ResidentView } from "./views/ResidentView";
 import { MoveView } from "./views/MoveView";
+import { OfficialView } from "./views/OfficialView";
 import { CertificateView } from "./views/CertificateView";
 import { ReportsView } from "./views/ReportsView";
 import { AdminView } from "./views/AdminView";
@@ -21,6 +22,7 @@ const NAV: Array<[ViewId, string]> = [
   ["search", "住民検索"],
   ["resident", "住民票"],
   ["move", "異動"],
+  ["official", "職権異動"],
   ["certificate", "証明発行"],
   ["restriction", "抑止設定"],
   ["reports", "統計/EUC"],
@@ -133,6 +135,24 @@ export function App() {
             const tx = await api.cancelTransaction({ transactionId: latest.transactionId, reason: "入力誤りのため取消" });
             notify(`異動取消を登録しました: ${tx.transactionId}`);
             if (selected?.residentId) await selectResident(selected.residentId, false);
+          }}
+        />
+      )}
+      {view === "official" && (
+        <OfficialView
+          resident={selected}
+          latestOfficial={history.find((tx) => tx.typeCode === "OFFICIAL") ?? null}
+          onCreate={async (req) => {
+            const tx = await api.officialTransaction(req);
+            notify(`職権異動を起票しました: ${tx.transactionId}`);
+            if (selected?.residentId) setHistory(await api.history(selected.residentId));
+            return tx;
+          }}
+          onApprove={async (txId, req) => {
+            const tx = await api.approveTransaction(txId, req);
+            notify(`決裁を反映しました: ${txId} / ${tx.status}`);
+            if (selected?.residentId) setHistory(await api.history(selected.residentId));
+            return tx;
           }}
         />
       )}

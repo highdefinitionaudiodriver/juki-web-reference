@@ -79,7 +79,7 @@
 | SCR-102 異動履歴 | `ResidentView` 内 timeline | ✓ |
 | SCR-411 転入届 | `MoveView` 左 | ✓ |
 | SCR-412 転出届 | `MoveView` 右 | ✓ |
-| SCR-421 職権異動 | – | – |
+| SCR-421 職権異動 | `OfficialView`（起票／決裁） | ✓ |
 | SCR-501 証明書発行 | `CertificateView`（PDF プレビュー＋発行＋PDF DL） | ✓ |
 | SCR-301 抑止設定 | `RestrictionView`（登録／一覧／解除） | ✓ |
 | SCR-601 統計/年報 | `ReportsView` 左 | ✓ |
@@ -92,6 +92,7 @@
 ### A. 機能拡張
 1. 残り帳票 (0010002–0010019, 年報) を `CertificatePdfService` の form_id ごとにレイアウト
 2. 連携 9 系統のうち、税 / 国保 / 選挙 / コンビニ / マイナポータルの業務別ペイロード反映
+3. Keycloak Authorization Code + PKCE ログイン
 
 ### B. 非機能
 1. Keycloak と Spring の実接続テスト（Authorization Code + PKCE）

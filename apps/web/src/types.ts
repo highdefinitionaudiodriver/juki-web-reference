@@ -7,6 +7,8 @@ export type PagedResidents = Schemas["PagedResidents"];
 export type Transaction = Schemas["Transaction"];
 export type MoveInReq = Schemas["MoveInReq"];
 export type MoveOutReq = Schemas["MoveOutReq"];
+export type OfficialTxReq = Schemas["OfficialTxReq"];
+export type ApprovalReq = Schemas["ApprovalReq"];
 export type CancelReq = Schemas["CancelReq"];
 export type JuminCodeReq = Schemas["JuminCodeReq"];
 export type MyNumberReq = Schemas["MyNumberReq"];
@@ -26,7 +28,7 @@ export type ForeignerExpiryReportReq = Schemas["ForeignerExpiryReportReq"];
 export type ForeignerExpiryJob = Schemas["ForeignerExpiryJob"];
 export type AliasName = Schemas["AliasName"];
 
-export type ViewId = "search" | "resident" | "move" | "certificate" | "restriction" | "reports" | "admin";
+export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin";
 
 export type SearchCriteria = {
   name: string;

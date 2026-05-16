@@ -582,6 +582,39 @@ async function handleApi(req, res, reqUrl) {
     return json(res, 201, tx);
   }
 
+  if (req.method === "POST" && path === "/transactions/official") {
+    if (!canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    if (!body.residentId) return json(res, 400, { code: "VALIDATION_ERROR", message: "residentId は必須です。" });
+    const resident = state.residents.find((r) => r.residentId === body.residentId);
+    if (!resident) return json(res, 404, { code: "NOT_FOUND", message: "対象住民が見つかりません。" });
+    const tx = createTransaction("OFFICIAL", resident, body.reasonCode || "OFFICIAL_FIX", body.eventDate || new Date().toISOString().slice(0, 10), [
+      { field: "content", valueBefore: null, valueAfter: body.content || "" },
+      { field: "legalBasis", valueBefore: null, valueAfter: body.legalBasis || "" },
+    ]);
+    tx.status = "DRAFT";
+    tx.approvalRoute = body.approvalRoute || ["REVIEW", "ADMIN"];
+    audit(user, "CREATE", "OFFICIAL_TRANSACTION", tx.transactionId, body);
+    return json(res, 201, tx);
+  }
+
+  const approveMatch = path.match(/^\/transactions\/([^/]+)\/approve$/);
+  if (approveMatch && req.method === "POST") {
+    if (!canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const tx = state.transactions.find((item) => item.transactionId === approveMatch[1]);
+    if (!tx) return json(res, 404, { code: "NOT_FOUND", message: "対象異動が見つかりません。" });
+    if (tx.typeCode !== "OFFICIAL") return json(res, 409, { code: "NOT_APPROVABLE", message: "決裁可能なのは職権異動のみです。" });
+    if (["APPLIED", "CANCELLED"].includes(tx.status)) {
+      return json(res, 409, { code: "ALREADY_FINALIZED", message: "確定済み異動は決裁できません。" });
+    }
+    const action = body.action || "APPROVE";
+    tx.status = action === "REMAND" ? "DRAFT" : action === "REJECT" ? "CANCELLED" : "APPLIED";
+    tx.approval = { action, comment: body.comment || "", approverUserId: user.userId, actedAt: new Date().toISOString() };
+    audit(user, "APPROVE", "OFFICIAL_TRANSACTION", tx.transactionId, tx.approval);
+    return json(res, 200, { transactionId: tx.transactionId, status: tx.status, step: 1 });
+  }
+
   if (req.method === "POST" && path === "/codes/jumin") {
     if (!canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
     const body = await readBody(req);

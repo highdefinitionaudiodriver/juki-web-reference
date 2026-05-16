@@ -299,3 +299,30 @@ test("戸籍連動受領: /link/internal/koseki から KOSEKI 異動を反映", 
   expect(body.transaction.reasonCode).toBe("KOSEKI_MARRIAGE");
   expect(body.transaction.kosekiNoticeId).toBe("KOSEKI-E2E-001");
 });
+
+test("職権異動: 起票から承認まで", async ({ request }) => {
+  const reviewHeaders = headers(["REVIEW", "ADMIN"]);
+  const draft = await request.post("/api/v1/transactions/official", {
+    headers: reviewHeaders,
+    data: {
+      residentId: "0000123456",
+      reasonCode: "OFFICIAL_FIX",
+      eventDate: "2026-05-16",
+      legalBasis: "住民基本台帳法に基づく職権修正",
+      content: "E2E 職権修正",
+      approvalRoute: ["REVIEW", "ADMIN"],
+    },
+  });
+  expect(draft.status()).toBe(201);
+  const tx = await draft.json();
+  expect(tx.typeCode).toBe("OFFICIAL");
+  expect(tx.status).toBe("DRAFT");
+
+  const approved = await request.post(`/api/v1/transactions/${tx.transactionId}/approve`, {
+    headers: reviewHeaders,
+    data: { action: "APPROVE", comment: "承認" },
+  });
+  expect(approved.status()).toBe(200);
+  const approvedJson = await approved.json();
+  expect(approvedJson.status).toBe("APPLIED");
+});

@@ -1,5 +1,6 @@
 import type {
   AsyncJob,
+  ApprovalReq,
   AuditLog,
   CancelReq,
   CodeIssueResult,
@@ -16,6 +17,7 @@ import type {
   MoveOutReq,
   JuminCodeReq,
   MyNumberReq,
+  OfficialTxReq,
   PagedResidents,
   ReportReq,
   Resident,
@@ -73,6 +75,9 @@ export const api = {
   },
   moveIn: (body: MoveInReq) => request<Transaction>("/transactions/in", { method: "POST", body: body as unknown as BodyInit }),
   moveOut: (body: MoveOutReq) => request<Transaction & { certificate: CertificateIssue }>("/transactions/out", { method: "POST", body: body as unknown as BodyInit }),
+  officialTransaction: (body: OfficialTxReq) => request<Transaction>("/transactions/official", { method: "POST", body: body as unknown as BodyInit }),
+  approveTransaction: (txId: string, body: ApprovalReq) =>
+    request<Transaction>(`/transactions/${txId}/approve`, { method: "POST", body: body as unknown as BodyInit }),
   cancelTransaction: (body: CancelReq) => request<Transaction>("/transactions/cancel", { method: "POST", body: body as unknown as BodyInit }),
   issueJuminCode: (body: JuminCodeReq) => request<CodeIssueResult>("/codes/jumin", { method: "POST", body: body as unknown as BodyInit }),
   issueMyNumber: (body: MyNumberReq) => request<CodeIssueResult>("/codes/mynumber", { method: "POST", body: body as unknown as BodyInit }),
