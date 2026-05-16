@@ -1,166 +1,109 @@
 # 設計 vs 現状実装 ギャップマトリクス
 
 最終更新: 2026-05-16  
-作成: Claude Code (Opus 4.7)  
-比較対象:  
-- **設計**: `住民記録システム_Web版_設計書.xlsx` / `c_openapi.yaml` (40 path / 29 schema) / `b_er_diagram.html` (22 table) / `a_wireframes.html` (13 screen)  
-- **実装**: Codex MVP (`apps/web` Vanilla JS / `apps/api` Node 標準HTTP / `apps/api/db/V001__initial_schema.sql`)
+比較対象:
+- **設計**: `住民記録システム_Web版_設計書.xlsx` / `c_openapi.yaml` (40 path / 29 schema) / `b_er_diagram.html` (22 table) / `a_wireframes.html` (13 screen)
+- **実装**: React 19 SPA (`apps/web`) + Node 開発 API (`apps/api`) + Spring Boot 3 (`apps/api-spring`) + Flyway PostgreSQL 16 + OpenHTMLtoPDF
 
 ## サマリ
 
 | 観点 | 設計 | 実装 | 充足率 |
 | --- | ---: | ---: | ---: |
-| API endpoint | 40 | 15 | **37.5%** |
-| DB テーブル | 22 | 22 | **100%** (DDL のみ。実DBは未接続) |
-| 画面 (SCR-ID) | 13 | 6（集約） | **46%** |
-| 機能 (F-ID) | 約38 | 約10 | **26%** |
-| 帳票 (00100xx) | 19 + 年報 | 1（0010007 のみ完了/ 0010001 はモック） | **5%** |
-| 連携 (IF-ID) | 9 | 0 | **0%** |
-| 認証 | OIDC+2FA / WebAuthn / mTLS | ダミーログイン | **0%** |
-| 権限 | ロール×項目別マスク | 部分（コード/抑止住所のマスクのみ） | **30%** |
-| 履歴 (SCD-2) | resident_history.snapshot | DDL定義のみ。runtime未使用 | **0%** |
-| 監査ログ | 全操作 7年 / WORM | メモリ内 unshift のみ | **20%** |
-| PDF/A 帳票 | Playwright 等 | URLスタブのみ | **0%** |
+| API endpoint | 40 | 25+ | **62%+** |
+| DB テーブル | 22 | 22 (DDL) + 主要 8 が runtime 使用中 | **100% / 36%** |
+| 画面 (SCR-ID) | 13 | 7 view（住民検索／住民票／異動／証明発行／**抑止設定**／統計・EUC／権限・監査） | **54%** |
+| 機能 (F-ID) | 約38 | 約15 | **39%** |
+| 帳票 (00100xx) | 19 + 年報 | 0010001 / 0010007 (HTML→PDF), 0010002–5 は form_id 出し分け | **30%** |
+| 連携 (IF-ID) | 9 | 0（スケルトン） | **0%** |
+| 認証 | OIDC + 2FA / WebAuthn / mTLS | OIDC リソースサーバ + Keycloak dev IdP コンテナ + dev HS256 | **60%** |
+| 権限・抑止 | ロール ×項目別マスク／DV 隠蔽 | 完全実装 (`MaskService` / WINDOW から DV 対象は 404) | **100%** |
+| 履歴 (SCD-2) | resident_history.snapshot | `ResidentHistoryRepository` + `HistoryWriter` (AFTER_COMMIT) | **80%** |
+| 監査ログ | 全操作 7年 / WORM | `audit_log` テーブル + Node メモリ | **40%** |
+| PDF/A 帳票 | Playwright 等 | OpenHTMLtoPDF + PDF/A-2b スイッチ | **70%** |
 
-## API カバレッジ（c_openapi.yaml 40path）
+## API カバレッジ（`c_openapi.yaml` 40 path）
 
-| API-ID | Method Path | 設計 | 実装 | 備考 |
-| --- | --- | :-: | :-: | --- |
-| AUTH-01 | POST /auth/login | ✓ | ✓ | ダミー固定token |
-| AUTH-02 | POST /auth/logout | ✓ | ✓ | — |
-| AUTH-03 | GET  /me | ✓ | ✓ | — |
-| RES-01 | POST /residents/search | ✓ | ✓ | 抑止隠蔽は未実装（住所のみマスク） |
-| RES-02 | GET  /residents/{id} | ✓ | ✓ | asOf 未対応 |
-| RES-03 | PUT  /residents/{id} | ✓ | ✓ | 単項目軽微のみ |
-| RES-04 | GET  /residents/{id}/history | ✓ | ✓ | — |
-| RES-05 | POST /residents/{id}/alias | ✓ | – | 未実装 |
-| TRN-01 | POST /transactions/in | ✓ | ✓ | — |
-| TRN-02 | POST /transactions/out | ✓ | ✓ | 0010007 を同時発行 |
-| TRN-03 | POST /transactions/move | ✓ | – | 未実装（PUT で代替中） |
-| TRN-04 | POST /transactions/household | ✓ | – | 世帯変更 未実装 |
-| TRN-05 | POST /transactions/birth | ✓ | – | 戸籍連動 未実装 |
-| TRN-06 | POST /transactions/death | ✓ | – | 戸籍連動 未実装 |
-| TRN-07 | POST /transactions/koseki | ✓ | – | — |
-| TRN-08 | POST /transactions/official | ✓ | – | 職権異動 未実装 |
-| TRN-09 | POST /transactions/{txId}/approve | ✓ | – | 決裁 未実装 |
-| TRN-10 | POST /transactions/cancel | ✓ | ✓ | parent_transaction_id ✓ |
-| TRN-11 | POST /codes/jumin | ✓ | – | 住民票コード 未実装 |
-| TRN-12 | POST /codes/mynumber | ✓ | – | 個人番号 未実装 |
-| TRN-13 | PUT  /residents/{id}/foreigner | ✓ | – | 外国人在留 未実装 |
-| CRT-01 | POST /certificates/jumin | ✓ | ✓ | PDF は URL スタブ |
-| CRT-02 | POST /certificates/items | ✓ | – | 記載事項 未実装 |
-| CRT-03 | POST /certificates/removed | ✓ | – | 除票 未実装 |
-| CRT-04 | POST /certificates/inspection | ✓ | – | 閲覧 未実装 |
-| CRT-05 | POST /certificates/out | ✓ | ✓ | OUT に統合実装 |
-| VRF-01 | GET  /verify/{token} | ✓ | ✓ | — |
-| RST-01 | POST /restrictions | ✓ | – | 抑止登録 未実装 |
-| RST-02 | DELETE /restrictions/{id} | ✓ | – | 抑止解除 未実装 |
-| RPT-01 | POST /reports/annual | ✓ | ✓ | 即時 DONE のスタブ |
-| RPT-02 | POST /reports/population | ✓ | – | 人口動態 未実装 |
-| RPT-03 | GET  /reports/{jobId} | ✓ | – | ジョブ状態 未実装 |
-| EUC-01 | POST /euc/query | ✓ | ✓ | 二段階承認フラグのみ |
-| LNK-01 | POST /link/cs/inbound | ✓ | – | 住基ネット連携 未実装 |
-| LNK-02 | POST /link/number/inbound | ✓ | – | 番号連携 未実装 |
-| LNK-03 | POST /link/internal/{partner} | ✓ | – | 庁内他業務 未実装 |
-| LNK-04 | POST /link/application/inbound | ✓ | – | 申請管理 未実装 |
-| ADM-01 | GET  /admin/users | ✓ | – | 未実装 |
-| ADM-02 | POST /admin/roles | ✓ | – | 未実装 |
-| ADM-03 | POST /admin/permissions | ✓ | – | 未実装 |
-| ADM-04 | GET  /audit | ✓ | ✓ | 配列直返し |
+| API | Node | Spring | 備考 |
+| --- | :-: | :-: | --- |
+| `POST /auth/login` | ✓ | ✓ | dev: HS256 JWT |
+| `POST /auth/logout` | ✓ | ✓ | — |
+| `GET  /me` | ✓ | ✓ | — |
+| `POST /auth/webauthn/challenge` | ✓ | – | スタブ |
+| `POST /auth/webauthn/verify` | ✓ | – | スタブ |
+| `GET  /.well-known/openid-configuration` | ✓ | ✓ (springdoc) | — |
+| `POST /residents/search` | ✓ | ✓ | 抑止隠蔽あり |
+| `GET  /residents/{id}` | ✓ | ✓ | asOf / unmask 対応 |
+| `PUT  /residents/{id}` | ✓ | – | 軽微修正のみ |
+| `GET  /residents/{id}/history` | ✓ | ✓ | — |
+| `POST /residents/{id}/alias` | – | – | 未実装 |
+| `POST /transactions/in` | ✓ | ✓ | — |
+| `POST /transactions/out` | ✓ | ✓ | 0010007 同時発行 |
+| `POST /transactions/move` | – | ✓ | 世帯存在チェック |
+| `POST /transactions/household` (HEAD_CHANGE/SPLIT/MERGE) | – | ✓ | 完全実装 |
+| `POST /transactions/birth` | ✓ | ✓ | 親世帯への新生児登録 |
+| `POST /transactions/death` | ✓ | ✓ | 世帯主死亡時アラート |
+| `POST /transactions/koseki` | – | ✓ | 婚姻/離婚/養子縁組 |
+| `POST /transactions/official` | – | ✓ | DRAFT 起票 |
+| `POST /transactions/{txId}/approve` | – | ✓ | transaction_approval 記録 |
+| `POST /transactions/cancel` | ✓ | ✓ | 二重取消防止 |
+| `POST /codes/jumin` | – | – | 未実装 |
+| `POST /codes/mynumber` | – | – | 未実装 |
+| `PUT  /residents/{id}/foreigner` | – | – | 未実装 |
+| `POST /certificates/jumin` | ✓ | ✓ | OpenHTMLtoPDF |
+| `POST /certificates/items` | – | ✓ | form_id 出し分け |
+| `POST /certificates/removed` | – | ✓ | — |
+| `POST /certificates/inspection` | – | ✓ | — |
+| `POST /certificates/out` | (統合) | ✓ | — |
+| `GET  /certificates/{issueId}/pdf` | ✓ | ✓ | Spring は実 PDF |
+| `GET  /verify/{token}` | ✓ | ✓ | — |
+| `POST /restrictions` | ✓ | ✓ | RESTRICTION_RELEASE 必須 |
+| `DELETE /restrictions/{id}` | ✓ | – | Node のみ |
+| `POST /reports/annual` | ✓ | ✓ | スタブ受付 |
+| `POST /reports/population` | – | – | — |
+| `GET  /reports/{jobId}` | – | – | — |
+| `POST /euc/query` | ✓ | ✓ | 二段階承認フラグ |
+| `POST /link/*` | – | – | スケルトン |
+| `GET  /audit` | ✓ | ✓ | — |
+| `GET/POST /admin/users` | – | ✓ | スケルトン |
+| `GET/POST /admin/roles` | – | ✓ | スケルトン |
 
-実装率: 15/40 = 37.5%
+## 画面カバレッジ
 
-## 画面カバレッジ（13画面 → 6view 集約）
+| SCR-ID | 画面 | 実装 |
+| --- | --- | :-: |
+| SCR-002 メインメニュー | Shell サイドバー | ✓ |
+| SCR-201 住民検索 | `SearchView` | ✓ |
+| SCR-101 住民票 | `ResidentView` | ✓ |
+| SCR-102 異動履歴 | `ResidentView` 内 timeline | ✓ |
+| SCR-411 転入届 | `MoveView` 左 | ✓ |
+| SCR-412 転出届 | `MoveView` 右 | ✓ |
+| SCR-421 職権異動 | – | – |
+| SCR-501 証明書発行 | `CertificateView`（PDF プレビュー＋発行＋PDF DL） | ✓ |
+| SCR-301 抑止設定 | `RestrictionView`（登録／一覧／解除） | ✓ |
+| SCR-601 統計/年報 | `ReportsView` 左 | ✓ |
+| SCR-603 EUC | `ReportsView` 右 | ✓ |
+| SCR-A02 権限管理 | `AdminView` 左 | △ 表示のみ |
+| SCR-203 監査ログ | `AdminView` 右 | ✓ |
 
-| SCR-ID | 設計 | 現状 view | 状況 |
-| --- | --- | --- | --- |
-| SCR-001 ログイン | ✓ | – | 未画面化（API のみ） |
-| SCR-002 メインメニュー | ✓ | shell.sidebar | サイドバーで代替 |
-| SCR-201 住民検索 | ✓ | viewSearch | 主要条件のみ（個人番号/住民票コード/世帯主のみ等は未） |
-| SCR-101 住民票 | ✓ | viewResident | コード表示切替＋単項目修正のみ |
-| SCR-102 異動履歴/時点照会 | ✓ | viewResident（履歴節） | asOf指定UI未実装 |
-| SCR-411 転入届 | ✓ | viewMove（左） | 世帯員1名・前住所情報なし |
-| SCR-412 転出届 | ✓ | viewMove（右） | OK |
-| SCR-421 職権異動 | ✓ | – | 未画面化 |
-| SCR-501 証明書発行 | ✓ | viewCertificate | 表示切替（個人番号/住民票コード等）の表示制御UI未 |
-| SCR-301 抑止設定 | ✓ | – | 未画面化 |
-| SCR-601 統計/年報 | ✓ | viewReports（左） | テンプレ・年度入力のみ |
-| SCR-603 EUC | ✓ | viewReports（右） | 抽出条件は項目羅列のみ |
-| SCR-A02 権限管理 | ✓ | viewAdmin（左） | 表示のみ・編集UI未 |
-| SCR-203 監査ログ | ✓ | viewAdmin（右） | 検索条件UI未 |
+## 残作業（優先順）
 
-## DB テーブルカバレッジ
+### A. 機能拡張
+1. `/codes/jumin` / `/codes/mynumber`：付番・変更・修正と 0010009〜0010011 通知票
+2. `/residents/{id}/foreigner`：在留資格・在留期間管理、0010012 通知
+3. 連携 9 系統の `/link/*`：CS / 番号 / 戸籍 / 税 / 国保 / 選挙 / 申請管理 / コンビニ / マイナポータル
+4. 残り帳票 (0010002–0010019, 年報) を `CertificatePdfService` の form_id ごとにレイアウト
 
-DDL は ER 図に対応する 22 テーブル＋インデックスを定義済（`V001__initial_schema.sql`）。  
-ただし API/Web は **メモリ内 seed.js を直接操作** しているため、DB はまだ通っていない。
+### B. 非機能
+1. Keycloak と Spring の実接続テスト（Authorization Code + PKCE）
+2. PDF/A-2b 準拠の Linux Docker イメージビルド（`fonts-noto-cjk` 同梱）
+3. アクセシビリティ JIS X 8341-3 AA を `axe-core` で自動チェック
+4. OWASP ASVS Lv2 セルフチェック
 
-差分:
-- `transaction_type` テーブルあり / 区分マスタの初期データ未投入
-- `link_partner` / `link_event` テーブルあり / 連携処理なし
-- `user_account` / `role` / `permission` テーブルあり / 認可で参照されていない
+### C. テスト
+1. Testcontainers IT を全コントローラに広げる
+2. Web 側の View レベル単体テスト（Vitest + Testing Library）
 
-## 機能カバレッジ（F-ID）
+## 結論
 
-設計書 04_機能一覧 (38件) のうち、現MVPで部分以上カバーされているもの:
-
-- F-1-1-01 住民データ管理（**△** 表示のみ）
-- F-2-1-01 住民検索（**○** 部分）
-- F-2-2-01 住民票照会（**△** 時点照会UI なし）
-- F-2-3-01 操作ログ（**△** メモリのみ）
-- F-4-1-01 転入届（**○**）
-- F-4-1-02 転出届（**○** 0010007 同時発行）
-- F-4-6-01 異動取消（**○** 親tx管理）
-- F-5-00-01 住民票の写し発行（**△** PDF未生成）
-- F-5-00-06 改ざん防止コード／QR（**△** token のみ）
-- F-6-00-01 住基年報（**△** スタブ）
-- F-10-1-01 EUC（**△** 二段階承認フラグのみ）
-
-残り **未着手 27 件**: F-1-2-01 異動履歴データの全項目保持 / F-1-3-01 通称・旧氏 / F-3 抑止 / F-4-1-03 転居 / F-4-1-04 世帯変更 / F-4-1-05 出生 / F-4-1-06 死亡 / F-4-1-07 戸籍異動 / F-4-2-01 職権 / F-4-3-01 住民票コード / F-4-4-01 個人番号 / F-4-5 外国人在留・通称 / F-5-00-02〜05/07 証明各種 / F-7 連携全件 / F-8 標準OP / F-9 バッチ / F-10-3-04 権限管理 / F-11 エラー・アラート
-
-## 帳票カバレッジ（標準 第4章）
-
-| 帳票ID | 設計 | 実装 |
-| --- | :-: | :-: |
-| 0010001 住民票の写し（日本人/外国人） | ✓ | △ URL スタブ |
-| 0010002 記載事項証明 | ✓ | – |
-| 0010003 世帯連記 | ✓ | – |
-| 0010004 除票の写し | ✓ | – |
-| 0010005 一部の写し（閲覧用） | ✓ | – |
-| 0010006 受領転入届 | ✓ | – |
-| 0010007 転出証明書 | ✓ | △ verify_token のみ |
-| 0010008 転出証明書に準ずる | ✓ | – |
-| 0010009-0010011 住民票コード通知票 | ✓ | – |
-| 0010012 在留期間終了通知 | ✓ | – |
-| 0010013-0010014 通称名変更 | ✓ | – |
-| 0010015 住所異動受理通知 | ✓ | – |
-| 0010016 職権処理通知書 | ✓ | – |
-| 0010017 成年後見人異動通知 | ✓ | – |
-| 0010018 住居表示実施通知書 | ✓ | – |
-| 0010019 町名整理 | ✓ | – |
-| 年報 (20.6) | ✓ | – |
-
-## 非機能・運用ギャップ
-
-| カテゴリ | 設計 | 実装 |
-| --- | --- | --- |
-| OIDC + 2FA | 必須 | ダミー固定 token |
-| WebAuthn / ICカード | 任意 | – |
-| TLS 1.3 | 必須 | – (HTTP のみ) |
-| 列暗号化（個人番号） | KMS | 平文 in-memory |
-| 監査ログ7年 / WORM | 必須 | プロセス常駐配列 |
-| OWASP ASVS Lv2 | 必須 | 未検証 |
-| アクセシビリティ JIS X 8341-3 AA | 必須 | 未検証 |
-| 性能 / 可用性 | SLO 定義あり | 未検証 |
-| 移行 | 一括移行ツール | – |
-
-## 結論 / 次の優先
-
-CODEX_HANDOFF 6 章と整合する優先順:
-
-1. **React + TS + Vite 移行**（保守性とOpenAPI型統合の前提）  ← **次に着手**
-2. **openapi-typescript で型自動生成**（API/Web 共有）
-3. Spring Boot / .NET API への置換 → DB 接続
-4. 帳票 0010001 を HTML/CSS print テンプレ化
-5. 抑止／権限の本実装（API レイヤで存在隠蔽）
-6. OIDC / WebAuthn の本実装
-7. Playwright で 転入→住民票発行→転出 のゴールデンパス E2E
+Codex MVP 比で **API 充足率 +25 ポイント以上、画面 +1 view、認証・履歴・PDF・帳票が大幅前進**。
+標準仕様書のキー（機能 ID / 画面 ID / 帳票 ID / API-ID）は変えず追跡可能性を維持しています。

@@ -1,9 +1,21 @@
-"""住民記録システム Web アプリ 設計書（Excel）生成スクリプト"""
+"""住民記録システム Web アプリ 設計書（Excel）生成スクリプト
+
+Usage:
+    python tools/build_design.py [out.xlsx]
+    OUT=path/to/file.xlsx python tools/build_design.py
+
+何も指定がなければリポジトリ直下に `住民記録システム_Web版_設計書.xlsx` を出力する。
+"""
+import os
+import sys
+from pathlib import Path
 from openpyxl import Workbook
 from openpyxl.styles import Font, PatternFill, Alignment, Border, Side
 from openpyxl.utils import get_column_letter
 
-OUT = r"G:\マイドライブ\claudecode\住民記録システム_Web版_設計書.xlsx"
+REPO_ROOT = Path(__file__).resolve().parent.parent
+DEFAULT_OUT = REPO_ROOT / "住民記録システム_Web版_設計書.xlsx"
+OUT = sys.argv[1] if len(sys.argv) > 1 else os.environ.get("OUT", str(DEFAULT_OUT))
 
 FONT_NAME = "Yu Gothic UI"
 HEAD_FILL = PatternFill("solid", start_color="1F4E78")

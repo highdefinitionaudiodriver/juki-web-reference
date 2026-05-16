@@ -1,7 +1,15 @@
 import { defineConfig, devices } from "@playwright/test";
 
+/**
+ * デフォルト Playwright 設定:
+ *  - `npm run e2e` で動く
+ *  - API ベースの E2E + UI ベースのスモークを含む
+ *  - Spring 専用テスト (spring-*.spec.ts) は除外 — `playwright.spring.config.ts` を使う
+ *  - API のみを高速に回すには `npm run e2e:api` (playwright.api.config.ts)
+ */
 export default defineConfig({
   testDir: "tests/e2e",
+  testIgnore: ["spring-*.spec.ts"],
   fullyParallel: false,
   retries: 0,
   reporter: [["list"]],

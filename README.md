@@ -74,8 +74,8 @@
 ### Node 開発サーバで動かす（最速）
 
 ```powershell
-git clone https://github.com/highdefinitionaudiodriver/-_Web-.git
-cd -_Web-
+git clone https://github.com/highdefinitionaudiodriver/juki-web-reference.git
+cd juki-web-reference
 npm install
 npm run dev
 # ブラウザで http://localhost:5173 (Vite dev) を開く

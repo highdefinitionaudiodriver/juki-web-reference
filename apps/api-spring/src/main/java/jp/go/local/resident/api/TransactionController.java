@@ -463,12 +463,73 @@ public class TransactionController {
     }
 
     /**
-     * 戸籍異動連動の汎用受付（婚姻・離婚・養子縁組 等）。
-     * 戸籍側 ID と reasonCode を受け、住民票記載を変更する。詳細は今後実装。
+     * 戸籍異動連動の受付（婚姻・離婚・養子縁組）。
+     *
+     * 入力:
+     *   - residentId: 対象住民
+     *   - eventDate: 戸籍変更日
+     *   - kind: MARRIAGE / DIVORCE / ADOPTION
+     *   - newFamilyNameKanji / newFamilyNameKana (任意): 氏変更があれば
+     *   - kosekiNoticeId (任意): 戸籍側通知 ID（監査用）
+     *
+     * 標準仕様 4.1.7「婚姻・離婚・養子縁組等」: 戸籍からの通知で住民票の氏を更新する。
+     * 世帯・住所は同時に変更されない（住所変更が伴う場合は別途 /transactions/move が必要）。
      */
     @PostMapping("/koseki")
-    public ResponseEntity<Map<String, Object>> koseki(@RequestBody(required = false) Map<String, Object> body) {
-        return ResponseEntity.status(201).body(stub("KOSEKI"));
+    @Transactional
+    public ResponseEntity<Map<String, Object>> koseki(@RequestBody Map<String, Object> body) {
+        String residentId = string(body.get("residentId"), null);
+        if (residentId == null || residentId.isBlank()) {
+            return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "residentId は必須です。"));
+        }
+        String kind = string(body.get("kind"), null);
+        if (kind == null || !java.util.Set.of("MARRIAGE", "DIVORCE", "ADOPTION").contains(kind)) {
+            return ResponseEntity.badRequest().body(error("VALIDATION_ERROR",
+                "kind は MARRIAGE / DIVORCE / ADOPTION のいずれかです。"));
+        }
+        Map<String, Object> target;
+        try {
+            target = jdbc.queryForMap(
+                "select household_id, family_name_kanji, family_name_kana, moved_out_date from resident where resident_id = ?",
+                residentId);
+        } catch (EmptyResultDataAccessException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("NOT_FOUND", "対象住民が見つかりません。"));
+        }
+        if (target.get("moved_out_date") != null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT)
+                .body(error("ALREADY_REMOVED", "除票済みの住民への戸籍連動は受理できません。"));
+        }
+        LocalDate eventDate = LocalDate.parse(string(body.get("eventDate"), LocalDate.now().toString()));
+
+        // 氏変更のある場合のみ更新（離婚復氏含む）
+        String newFamilyKanji = string(body.get("newFamilyNameKanji"), null);
+        String newFamilyKana = string(body.get("newFamilyNameKana"), null);
+        if (newFamilyKanji != null && !newFamilyKanji.isBlank()) {
+            jdbc.update(
+                "update resident set family_name_kanji = ?, family_name_kana = coalesce(?, family_name_kana) where resident_id = ?",
+                newFamilyKanji, newFamilyKana, residentId);
+        }
+
+        String reasonCode = switch (kind) {
+            case "MARRIAGE" -> "KOSEKI_MARRIAGE";
+            case "DIVORCE" -> "KOSEKI_DIVORCE";
+            case "ADOPTION" -> "KOSEKI_ADOPTION";
+            default -> "KOSEKI";
+        };
+        Map<String, Object> tx = insertTransaction("KOSEKI", residentId,
+            string(target.get("household_id"), null), reasonCode, eventDate, null);
+        events.publishEvent(new ResidentChangedEvent(residentId, (String) tx.get("transactionId"), reasonCode));
+
+        Object kosekiNoticeId = body.get("kosekiNoticeId");
+        if (kosekiNoticeId != null) {
+            tx.put("kosekiNoticeId", kosekiNoticeId);
+        }
+        if (newFamilyKanji != null && !newFamilyKanji.isBlank()) {
+            tx.put("familyNameChanged", true);
+            tx.put("oldFamilyNameKanji", target.get("family_name_kanji"));
+            tx.put("newFamilyNameKanji", newFamilyKanji);
+        }
+        return ResponseEntity.status(201).body(tx);
     }
 
     private Map<String, Object> insertTransaction(String typeCode, String residentId, String householdId, String reasonCode, LocalDate eventDate, String parentId) {
