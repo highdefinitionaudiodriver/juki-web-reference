@@ -19,7 +19,7 @@
 | 権限・抑止 | ロール ×項目別マスク／DV 隠蔽 | 完全実装 (`MaskService` / WINDOW から DV 対象は 404) | **100%** |
 | 履歴 (SCD-2) | resident_history.snapshot | `ResidentHistoryRepository` + `HistoryWriter` (AFTER_COMMIT) | **80%** |
 | 監査ログ | 全操作 7年 / WORM | `audit_log` テーブル + Node メモリ | **40%** |
-| PDF/A 帳票 | Playwright 等 | OpenHTMLtoPDF + PDF/A-2b スイッチ | **70%** |
+| PDF/A 帳票 | Playwright 等 | OpenHTMLtoPDF + PDF/A-2b スイッチ + Noto CJK Dockerfile | **75%** |
 
 ## API カバレッジ（`c_openapi.yaml` 40 path）
 
@@ -96,7 +96,7 @@
 
 ### B. 非機能
 1. Keycloak と Spring の実接続テスト（実 JWT 検証）
-2. PDF/A-2b 準拠の Linux Docker イメージビルド（`fonts-noto-cjk` 同梱）
+2. PDF/A-2b 準拠を veraPDF で CI 検証
 3. アクセシビリティ JIS X 8341-3 AA を `axe-core` で自動チェック
 4. OWASP ASVS Lv2 セルフチェック
 
