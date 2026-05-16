@@ -29,6 +29,9 @@ jobs:
       - name: TypeScript + Node check
         run: npm run check
 
+      - name: Web unit tests (Vitest)
+        run: npm run web:test
+
       - name: Node API smoke
         run: npm run smoke
 

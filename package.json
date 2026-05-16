@@ -12,6 +12,7 @@
     "web:dev": "npm --workspace @resident-record/web run dev",
     "web:build": "npm --workspace @resident-record/web run build",
     "web:typecheck": "npm --workspace @resident-record/web run typecheck",
+    "web:test": "npm --workspace @resident-record/web run test",
     "dev": "concurrently -k -n api,web -c blue,green \"npm:api:dev\" \"npm:web:dev\"",
     "build": "npm run generate:openapi && npm run web:build",
     "generate:openapi": "npm --workspace @resident-record/openapi run generate",
@@ -20,10 +21,12 @@
     "e2e": "playwright test",
     "e2e:api": "playwright test -c playwright.api.config.ts",
     "e2e:spring": "playwright test -c playwright.spring.config.ts",
+    "e2e:a11y": "playwright test tests/e2e/a11y.spec.ts",
     "e2e:install": "playwright install chromium",
     "openapi:diff": "node tools/openapi-diff.mjs"
   },
   "devDependencies": {
+    "@axe-core/playwright": "^4.11.3",
     "@playwright/test": "^1.60.0",
     "concurrently": "^9.1.0",
     "js-yaml": "^4.1.1",
