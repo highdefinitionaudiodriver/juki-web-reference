@@ -79,9 +79,37 @@ export function CertificateView({ resident, onIssue }: Props) {
             <button type="button" onClick={() => window.print()}>印刷プレビュー</button>
           </div>
           {issued && (
-            <p className="muted" style={{ marginTop: 8 }}>
-              発行済: {issued.issueId} / verify_token: {issued.verifyToken} / 手数料: {issued.fee}円
-            </p>
+            <div className="notice" style={{ marginTop: 8 }}>
+              <div>
+                発行済: <strong>{issued.issueId}</strong> / 手数料 <strong>{issued.fee}円</strong>
+              </div>
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap", marginTop: 8 }}>
+                <a
+                  className="primary"
+                  style={{ textDecoration: "none", padding: "6px 12px", borderRadius: 6, color: "#fff" }}
+                  href={`/api/v1/certificates/${encodeURIComponent(issued.issueId ?? "")}/pdf`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                >
+                  PDF を表示
+                </a>
+                <a
+                  href={`/api/v1/certificates/${encodeURIComponent(issued.issueId ?? "")}/pdf`}
+                  download={`certificate-${issued.issueId}.pdf`}
+                  style={{ alignSelf: "center" }}
+                >
+                  PDF をダウンロード
+                </a>
+                <a
+                  href={`/api/v1/verify/${encodeURIComponent(issued.verifyToken ?? "")}`}
+                  target="_blank"
+                  rel="noopener noreferrer"
+                  style={{ alignSelf: "center" }}
+                >
+                  改ざん防止コード検証 ({issued.verifyToken})
+                </a>
+              </div>
+            </div>
           )}
         </form>
       </section>

@@ -123,30 +123,139 @@ public class TransactionController {
 
     @PostMapping("/household")
     @Transactional
+    @SuppressWarnings("unchecked")
     public ResponseEntity<Map<String, Object>> household(@RequestBody Map<String, Object> body) {
         String householdId = string(body.get("householdId"), "");
         String operation = string(body.get("operation"), "HOUSEHOLD_CHANGE");
         String newHead = string(body.get("newHeadResidentId"), null);
+        LocalDate eventDate = LocalDate.parse(string(body.get("eventDate"), LocalDate.now().toString()));
         if (householdId.isBlank()) {
             return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "householdId は必須です。"));
         }
-        // 世帯主変更: 新世帯主が同世帯の在籍員であることをチェック
-        if ("HEAD_CHANGE".equals(operation)) {
-            if (newHead == null || newHead.isBlank()) {
-                return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "HEAD_CHANGE では newHeadResidentId が必須です。"));
-            }
-            Integer hits = jdbc.queryForObject("""
-                select count(*) from resident
-                 where resident_id = ? and household_id = ? and moved_out_date is null
-                """, Integer.class, newHead, householdId);
-            if (hits == null || hits == 0) {
-                return ResponseEntity.status(HttpStatus.CONFLICT).body(error("HEAD_NOT_IN_HOUSEHOLD", "指定された新世帯主は同一世帯の在籍員ではありません。"));
-            }
-            jdbc.update("update household set head_resident_id = ? where household_id = ?", newHead, householdId);
-            jdbc.update("update household_member set relation_to_head = '本人' where household_id = ? and resident_id = ?", householdId, newHead);
+        Integer existingCount = jdbc.queryForObject(
+            "select count(*) from household where household_id = ? and closed_date is null",
+            Integer.class, householdId);
+        if (existingCount == null || existingCount == 0) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("HOUSEHOLD_NOT_FOUND", "対象世帯が見つかりません。"));
         }
-        Map<String, Object> tx = insertTransaction("HOUSEHOLD", newHead, householdId, operation,
-            LocalDate.parse(string(body.get("eventDate"), LocalDate.now().toString())), null);
+
+        switch (operation) {
+            case "HEAD_CHANGE" -> {
+                if (newHead == null || newHead.isBlank()) {
+                    return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "HEAD_CHANGE では newHeadResidentId が必須です。"));
+                }
+                Integer hits = jdbc.queryForObject("""
+                    select count(*) from resident
+                     where resident_id = ? and household_id = ? and moved_out_date is null
+                    """, Integer.class, newHead, householdId);
+                if (hits == null || hits == 0) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(error("HEAD_NOT_IN_HOUSEHOLD", "指定された新世帯主は同一世帯の在籍員ではありません。"));
+                }
+                jdbc.update("update household set head_resident_id = ? where household_id = ?", newHead, householdId);
+                jdbc.update("update household_member set relation_to_head = '本人' where household_id = ? and resident_id = ?", householdId, newHead);
+            }
+            case "SPLIT" -> {
+                // 分離する住民 ID リストと、新世帯の世帯主、住所
+                List<Object> raw = body.get("targetResidentIds") instanceof List<?> list
+                    ? new java.util.ArrayList<>(list) : new java.util.ArrayList<>();
+                if (raw.isEmpty()) {
+                    return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "SPLIT には targetResidentIds が必要です。"));
+                }
+                if (newHead == null || newHead.isBlank() || !raw.stream().map(String::valueOf).anyMatch(newHead::equals)) {
+                    return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "SPLIT には newHeadResidentId が必要で、targetResidentIds に含まれる必要があります。"));
+                }
+                String newAddress = string(body.get("newAddress"), null);
+                if (newAddress == null || newAddress.isBlank()) {
+                    return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "SPLIT には newAddress が必要です。"));
+                }
+                // 対象住民全員が現世帯に属していることを確認
+                List<String> targets = raw.stream().map(String::valueOf).toList();
+                String placeholders = String.join(",", java.util.Collections.nCopies(targets.size(), "?"));
+                Object[] checkParams = new Object[targets.size() + 1];
+                for (int i = 0; i < targets.size(); i++) checkParams[i] = targets.get(i);
+                checkParams[targets.size()] = householdId;
+                Integer aligned = jdbc.queryForObject(
+                    "select count(*) from resident where resident_id in (" + placeholders + ") and household_id = ? and moved_out_date is null",
+                    Integer.class, checkParams);
+                if (aligned == null || aligned != targets.size()) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(error("MEMBERS_NOT_IN_HOUSEHOLD", "対象住民の一部が現世帯に在籍していません。"));
+                }
+                // 元世帯の全員を分離すると親世帯が空になる
+                Integer total = jdbc.queryForObject(
+                    "select count(*) from resident where household_id = ? and moved_out_date is null",
+                    Integer.class, householdId);
+                if (total != null && total.equals(targets.size())) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(error("CANNOT_SPLIT_ALL", "世帯員全員を分離することはできません。HEAD_CHANGE か MERGE を検討してください。"));
+                }
+                String newHouseholdId = "H-" + System.currentTimeMillis();
+                jdbc.update("""
+                    insert into household (household_id, head_resident_id, address_code, address_text, established_date)
+                    values (?, ?, ?, ?, ?)
+                    """, newHouseholdId, newHead, string(body.get("newAddressCode"), ""), newAddress, eventDate);
+                // 対象住民を新世帯へ移動
+                for (String rid : targets) {
+                    jdbc.update("update resident set household_id = ?, address_text = ?, address_code = ? where resident_id = ?",
+                        newHouseholdId, newAddress, string(body.get("newAddressCode"), ""), rid);
+                    jdbc.update("update household_member set left_date = ? where household_id = ? and resident_id = ? and left_date is null",
+                        eventDate, householdId, rid);
+                    jdbc.update("""
+                        insert into household_member (household_id, resident_id, relation_to_head, joined_date)
+                        values (?, ?, ?, ?)
+                        """, newHouseholdId, rid, rid.equals(newHead) ? "本人" : "—", eventDate);
+                }
+                Map<String, Object> tx = insertTransaction("HOUSEHOLD", newHead, newHouseholdId, "SPLIT", eventDate, null);
+                publishHouseholdResidents(newHouseholdId, (String) tx.get("transactionId"), "SPLIT");
+                publishHouseholdResidents(householdId, (String) tx.get("transactionId"), "SPLIT_REMAINING");
+                tx.put("parentHouseholdId", householdId);
+                tx.put("newHouseholdId", newHouseholdId);
+                return ResponseEntity.status(201).body(tx);
+            }
+            case "MERGE" -> {
+                String absorbingHouseholdId = string(body.get("absorbingHouseholdId"), null);
+                if (absorbingHouseholdId == null || absorbingHouseholdId.isBlank()) {
+                    return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "MERGE には absorbingHouseholdId が必要です。"));
+                }
+                if (absorbingHouseholdId.equals(householdId)) {
+                    return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "同一世帯を合併先に指定できません。"));
+                }
+                Integer absorberExists = jdbc.queryForObject(
+                    "select count(*) from household where household_id = ? and closed_date is null",
+                    Integer.class, absorbingHouseholdId);
+                if (absorberExists == null || absorberExists == 0) {
+                    return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("HOUSEHOLD_NOT_FOUND", "吸収先世帯が見つかりません。"));
+                }
+                Map<String, Object> absorber = jdbc.queryForMap(
+                    "select address_text, address_code from household where household_id = ?", absorbingHouseholdId);
+                // 対象世帯の在籍全員を吸収先へ
+                List<Map<String, Object>> moving = jdbc.queryForList(
+                    "select resident_id from resident where household_id = ? and moved_out_date is null", householdId);
+                if (moving.isEmpty()) {
+                    return ResponseEntity.status(HttpStatus.CONFLICT).body(error("HOUSEHOLD_EMPTY", "合併元世帯に在籍員がいません。"));
+                }
+                for (Map<String, Object> row : moving) {
+                    String rid = String.valueOf(row.get("resident_id"));
+                    jdbc.update("update resident set household_id = ?, address_text = ?, address_code = ? where resident_id = ?",
+                        absorbingHouseholdId, absorber.get("address_text"), absorber.get("address_code"), rid);
+                    jdbc.update("update household_member set left_date = ? where household_id = ? and resident_id = ? and left_date is null",
+                        eventDate, householdId, rid);
+                    jdbc.update("""
+                        insert into household_member (household_id, resident_id, relation_to_head, joined_date)
+                        values (?, ?, ?, ?)
+                        """, absorbingHouseholdId, rid, "—", eventDate);
+                }
+                // 合併元を閉鎖
+                jdbc.update("update household set closed_date = ? where household_id = ?", eventDate, householdId);
+                Map<String, Object> tx = insertTransaction("HOUSEHOLD", newHead, absorbingHouseholdId, "MERGE", eventDate, null);
+                publishHouseholdResidents(absorbingHouseholdId, (String) tx.get("transactionId"), "MERGE");
+                tx.put("absorbedHouseholdId", householdId);
+                tx.put("absorbingHouseholdId", absorbingHouseholdId);
+                return ResponseEntity.status(201).body(tx);
+            }
+            default -> {
+                // 任意操作（履歴のみ記録）
+            }
+        }
+        Map<String, Object> tx = insertTransaction("HOUSEHOLD", newHead, householdId, operation, eventDate, null);
         publishHouseholdResidents(householdId, (String) tx.get("transactionId"), "HOUSEHOLD_CHANGE");
         return ResponseEntity.status(201).body(tx);
     }

@@ -6,9 +6,10 @@ on:
   workflow_dispatch:
 
 jobs:
-  node-and-spring:
+  web-and-node:
+    name: Web + Node API
     runs-on: ubuntu-latest
-    timeout-minutes: 20
+    timeout-minutes: 15
     steps:
       - name: Checkout
         uses: actions/checkout@v4
@@ -25,25 +26,58 @@ jobs:
       - name: Generate OpenAPI types
         run: npm run generate:openapi
 
-      - name: Check web and Node API
+      - name: TypeScript + Node check
         run: npm run check
 
       - name: Node API smoke
         run: npm run smoke
 
-      - name: Node API E2E
+      - name: Node API E2E (Playwright)
         run: npm run e2e:api
 
       - name: Build web
         run: npm run web:build
 
-      - name: Setup Java
+      - name: Upload Playwright report (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: playwright-report-node
+          path: |
+            playwright-report/
+            test-results/
+          if-no-files-found: ignore
+          retention-days: 7
+
+  spring:
+    name: Spring Boot + Testcontainers
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Java 21
         uses: actions/setup-java@v4
         with:
           distribution: microsoft
           java-version: "21"
           cache: maven
 
-      - name: Spring tests
+      # ubuntu-latest にはデフォルトで Docker が利用可能なので、
+      # Testcontainers の PostgreSQL コンテナがそのまま起動する
+      - name: Verify Docker available
+        run: docker info
+
+      - name: Spring unit + integration tests
         working-directory: apps/api-spring
         run: mvn -B test
+
+      - name: Upload Surefire reports (on failure)
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: surefire-reports
+          path: apps/api-spring/target/surefire-reports/
+          if-no-files-found: ignore
+          retention-days: 7

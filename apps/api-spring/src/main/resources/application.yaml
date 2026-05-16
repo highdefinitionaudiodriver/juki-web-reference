@@ -42,3 +42,14 @@ springdoc:
     path: /swagger-ui.html
     enabled: true
   default-produces-media-type: application/json
+
+certificate:
+  municipality: ${MUNICIPALITY_NAME:サンプル市}
+  mayor: ${MAYOR_NAME:山田 一郎}
+  # 和文フォント TTF/OTF への絶対パス。設定すれば PDF に埋め込み、和文を確実に描画。
+  #   例 (Linux): /usr/share/fonts/opentype/noto/NotoSerifCJK-Regular.ttc
+  #   例 (Windows): C:/Windows/Fonts/yumin.ttf
+  font:
+    serif-jp: ${CERT_FONT_SERIF_JP:}
+  # PDF/A-2b 準拠で出力するか。true の場合は font.serif-jp の設定が必須。
+  pdfa: ${CERT_PDF_A:false}

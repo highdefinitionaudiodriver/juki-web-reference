@@ -1,7 +1,9 @@
 package jp.go.local.resident.service;
 
+import com.openhtmltopdf.outputdevice.helper.BaseRendererBuilder;
 import com.openhtmltopdf.pdfboxout.PdfRendererBuilder;
 import java.io.ByteArrayOutputStream;
+import java.io.File;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
@@ -41,6 +43,14 @@ public class CertificatePdfService {
 
     @Value("${certificate.mayor:山田 一郎}")
     private String mayorName;
+
+    /** 和文フォント (TTF/OTF) の絶対パス。設定があれば PDF に埋め込む。未設定なら OS フォント任せ。 */
+    @Value("${certificate.font.serif-jp:}")
+    private String serifJpFontPath;
+
+    /** PDF/A-2b 準拠で出力するか。true の場合は和文フォントの埋め込みが必須。 */
+    @Value("${certificate.pdfa:false}")
+    private boolean pdfA;
 
     public CertificatePdfService(JdbcTemplate jdbc) {
         this.jdbc = jdbc;
@@ -111,9 +121,20 @@ public class CertificatePdfService {
         try {
             PdfRendererBuilder builder = new PdfRendererBuilder();
             builder.useFastMode();
-            // Noto Sans/Serif CJK が OS にインストールされている場合のみ埋め込み。
-            // 無い場合は Helvetica などにフォールバックして全角は ?? になりがちなので、
-            // 本番環境では fonts-noto-cjk を必ず入れること。
+            // 和文フォント埋め込み: certificate.font.serif-jp で TTF/OTF パスを指定された場合のみ。
+            // 設定がない場合は OS にインストール済みのフォントへフォールバック（本番では fonts-noto-cjk を必ず入れる）。
+            if (serifJpFontPath != null && !serifJpFontPath.isBlank()) {
+                File fontFile = new File(serifJpFontPath);
+                if (fontFile.exists()) {
+                    builder.useFont(fontFile, "NotoSerifJP", 400, BaseRendererBuilder.FontStyle.NORMAL, true);
+                }
+            }
+            // PDF/A-2b conformance: 設定が true かつ和文フォント埋め込みが有効な場合のみ。
+            // フォント埋め込み無しで PDF/A を要求すると OpenHTMLtoPDF がエラーを投げる。
+            if (pdfA && serifJpFontPath != null && !serifJpFontPath.isBlank()
+                && new File(serifJpFontPath).exists()) {
+                builder.usePdfAConformance(PdfRendererBuilder.PdfAConformance.PDFA_2_B);
+            }
             builder.withHtmlContent(html, null);
             builder.toStream(out);
             builder.run();
