@@ -19,6 +19,9 @@ const FORM_TITLE: Record<string, string> = {
   "0010003": "住 民 票 の 写 し （世帯連記）",
   "0010004": "住民票の除票の写し",
   "0010007": "転 出 証 明 書",
+  "0010009": "住民票コード通知票",
+  "0010010": "個人番号通知票",
+  "0010011": "住民票コード・個人番号変更通知票",
 };
 
 function formatWareki(dateStr?: string | null): string {

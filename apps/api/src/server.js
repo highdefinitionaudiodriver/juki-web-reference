@@ -153,6 +153,52 @@ function issueCertificate(user, residentId, formId, copies, usageText) {
   return issue;
 }
 
+function codeNotificationFormId(field, operation) {
+  if (field === "juminCode" && operation === "ISSUE") return "0010009";
+  if (field === "myNumber" && operation === "ISSUE") return "0010010";
+  return "0010011";
+}
+
+function codeNotificationLabel(field, operation) {
+  const target = field === "juminCode" ? "住民票コード" : "個人番号";
+  const op = { ISSUE: "付番", CHANGE: "変更", FIX: "修正" }[operation] || operation;
+  return `${target}${op}通知`;
+}
+
+function generatedDigits(length, prefix) {
+  return (prefix + String(Date.now())).repeat(2).slice(0, length);
+}
+
+function handleCodeOperation(user, resident, field, body) {
+  const operation = body.operation || "ISSUE";
+  if (!["ISSUE", "CHANGE", "FIX"].includes(operation)) {
+    return { status: 400, body: { code: "VALIDATION_ERROR", message: "operation は ISSUE / CHANGE / FIX のいずれかです。" } };
+  }
+  const length = field === "juminCode" ? 11 : 12;
+  const payloadField = field === "juminCode" ? "code" : "number";
+  const value = body[payloadField] || generatedDigits(length, field === "juminCode" ? "9" : "8");
+  if (!new RegExp(`^\\d{${length}}$`).test(value)) {
+    return { status: 400, body: { code: "VALIDATION_ERROR", message: `${payloadField} は ${length} 桁の数字で指定してください。` } };
+  }
+  const current = String(resident[field] || "");
+  const hasCurrent = Boolean(current) && !current.includes("*") && !/^0+$/.test(current);
+  if (operation === "ISSUE" && hasCurrent) {
+    return { status: 409, body: { code: "CURRENT_CODE_EXISTS", message: "現行コードが既に存在します。" } };
+  }
+  if (operation !== "ISSUE" && !hasCurrent) {
+    return { status: 409, body: { code: "CURRENT_CODE_NOT_FOUND", message: "変更・修正対象の現行コードがありません。" } };
+  }
+  resident[field] = value;
+  const certificate = issueCertificate(
+    user,
+    resident.residentId,
+    codeNotificationFormId(field, operation),
+    1,
+    codeNotificationLabel(field, operation),
+  );
+  return { status: 201, body: { residentId: resident.residentId, operation, [field]: value, certificate } };
+}
+
 function minimalCertificatePdf(issue) {
   const lines = [
     "Resident Record Certificate",
@@ -393,6 +439,28 @@ async function handleApi(req, res, reqUrl) {
     tx.status = "APPLIED";
     audit(user, "UPDATE", "TRANSACTION", tx.transactionId, { type: "DEATH", residentId: target.residentId });
     return json(res, 201, tx);
+  }
+
+  if (req.method === "POST" && path === "/codes/jumin") {
+    if (!canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    if (!body.residentId) return json(res, 400, { code: "VALIDATION_ERROR", message: "residentId は必須です。" });
+    const resident = state.residents.find((r) => r.residentId === body.residentId);
+    if (!resident) return json(res, 404, { code: "NOT_FOUND", message: "対象住民が見つかりません。" });
+    const result = handleCodeOperation(user, resident, "juminCode", body);
+    if (result.status === 201) audit(user, "UPDATE", "JUMIN_CODE", body.residentId, { operation: result.body.operation });
+    return json(res, result.status, result.body);
+  }
+
+  if (req.method === "POST" && path === "/codes/mynumber") {
+    if (!canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    if (!body.residentId) return json(res, 400, { code: "VALIDATION_ERROR", message: "residentId は必須です。" });
+    const resident = state.residents.find((r) => r.residentId === body.residentId);
+    if (!resident) return json(res, 404, { code: "NOT_FOUND", message: "対象住民が見つかりません。" });
+    const result = handleCodeOperation(user, resident, "myNumber", body);
+    if (result.status === 201) audit(user, "UPDATE", "MY_NUMBER", body.residentId, { operation: result.body.operation });
+    return json(res, result.status, result.body);
   }
 
   if (req.method === "POST" && path === "/transactions/cancel") {

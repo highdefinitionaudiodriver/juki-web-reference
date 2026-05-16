@@ -200,3 +200,49 @@ test("個人番号は WINDOW ロールではマスク, ADMIN+unmask で平文", 
   expect(uJson.myNumber).not.toContain("*");
   expect(uJson.juminCode).not.toContain("*");
 });
+
+test("住民票コード/個人番号の付番変更で通知票を発行", async ({ request }) => {
+  const reviewHeaders = headers(["REVIEW", "ADMIN"]);
+  const eventDate = new Date().toISOString().slice(0, 10);
+  const birth = await request.post("/api/v1/transactions/birth", {
+    headers: reviewHeaders,
+    data: {
+      parentResidentId: "0000123456",
+      eventDate,
+      familyNameKanji: "通知",
+      givenNameKanji: "花",
+      familyNameKana: "ツウチ",
+      givenNameKana: "ハナ",
+      sex: "F",
+    },
+  });
+  expect(birth.status()).toBe(201);
+  const baby = await birth.json();
+
+  const jumin = await request.post("/api/v1/codes/jumin", {
+    headers: reviewHeaders,
+    data: { residentId: baby.residentId, operation: "ISSUE", code: "45678901234" },
+  });
+  expect(jumin.status()).toBe(201);
+  const juminJson = await jumin.json();
+  expect(juminJson.juminCode).toBe("45678901234");
+  expect(juminJson.certificate.formId).toBe("0010009");
+
+  const myNumberIssue = await request.post("/api/v1/codes/mynumber", {
+    headers: reviewHeaders,
+    data: { residentId: baby.residentId, operation: "ISSUE", number: "423456789012" },
+  });
+  expect(myNumberIssue.status()).toBe(201);
+  const myNumberIssueJson = await myNumberIssue.json();
+  expect(myNumberIssueJson.myNumber).toBe("423456789012");
+  expect(myNumberIssueJson.certificate.formId).toBe("0010010");
+
+  const myNumberChange = await request.post("/api/v1/codes/mynumber", {
+    headers: reviewHeaders,
+    data: { residentId: baby.residentId, operation: "CHANGE", number: "523456789012" },
+  });
+  expect(myNumberChange.status()).toBe(201);
+  const myNumberChangeJson = await myNumberChange.json();
+  expect(myNumberChangeJson.myNumber).toBe("523456789012");
+  expect(myNumberChangeJson.certificate.formId).toBe("0010011");
+});

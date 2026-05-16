@@ -46,8 +46,8 @@
 | `POST /transactions/official` | – | ✓ | DRAFT 起票 |
 | `POST /transactions/{txId}/approve` | – | ✓ | transaction_approval 記録 |
 | `POST /transactions/cancel` | ✓ | ✓ | 二重取消防止 |
-| `POST /codes/jumin` | – | – | 未実装 |
-| `POST /codes/mynumber` | – | – | 未実装 |
+| `POST /codes/jumin` | ✓ | ✓ | 付番/変更/修正 + 通知票 0010009/0010011 |
+| `POST /codes/mynumber` | ✓ | ✓ | 付番/変更/修正 + 通知票 0010010/0010011 |
 | `PUT  /residents/{id}/foreigner` | – | – | 未実装 |
 | `POST /certificates/jumin` | ✓ | ✓ | OpenHTMLtoPDF |
 | `POST /certificates/items` | – | ✓ | form_id 出し分け |
@@ -88,10 +88,9 @@
 ## 残作業（優先順）
 
 ### A. 機能拡張
-1. `/codes/jumin` / `/codes/mynumber`：付番・変更・修正と 0010009〜0010011 通知票
-2. `/residents/{id}/foreigner`：在留資格・在留期間管理、0010012 通知
-3. 連携 9 系統の `/link/*`：CS / 番号 / 戸籍 / 税 / 国保 / 選挙 / 申請管理 / コンビニ / マイナポータル
-4. 残り帳票 (0010002–0010019, 年報) を `CertificatePdfService` の form_id ごとにレイアウト
+1. `/residents/{id}/foreigner`：在留資格・在留期間管理、0010012 通知
+2. 連携 9 系統の `/link/*`：CS / 番号 / 戸籍 / 税 / 国保 / 選挙 / 申請管理 / コンビニ / マイナポータル
+3. 残り帳票 (0010002–0010019, 年報) を `CertificatePdfService` の form_id ごとにレイアウト
 
 ### B. 非機能
 1. Keycloak と Spring の実接続テスト（Authorization Code + PKCE）

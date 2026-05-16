@@ -690,12 +690,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Created */
+                /** @description Created（通知票 0010009/0010011 を同時発行） */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["CodeIssueResult"];
+                    };
                 };
             };
         };
@@ -728,12 +730,14 @@ export interface paths {
                 };
             };
             responses: {
-                /** @description Created */
+                /** @description Created（通知票 0010010/0010011 を同時発行） */
                 201: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["CodeIssueResult"];
+                    };
                 };
             };
         };
@@ -1805,7 +1809,7 @@ export interface components {
         CertificateReq: {
             residentId: string;
             /** @enum {string} */
-            formId: "0010001" | "0010002" | "0010003" | "0010004" | "0010005" | "0010007" | "0010008";
+            formId: "0010001" | "0010002" | "0010003" | "0010004" | "0010005" | "0010007" | "0010008" | "0010009" | "0010010" | "0010011";
             /** @enum {string} */
             scope?: "SELF" | "HOUSEHOLD" | "MEMBERS";
             showJuminCode?: boolean;
@@ -1828,6 +1832,16 @@ export interface components {
             issuedAt?: string;
             /** @enum {string} */
             channel?: "WINDOW" | "CVS" | "ONLINE";
+        };
+        CodeIssueResult: {
+            residentId?: string;
+            /** @enum {string} */
+            operation?: "ISSUE" | "CHANGE" | "FIX";
+            /** @description 住民票コード処理時のみ */
+            juminCode?: string;
+            /** @description 個人番号処理時のみ */
+            myNumber?: string;
+            certificate?: components["schemas"]["CertificateIssue"];
         };
         VerifyResult: {
             valid?: boolean;
