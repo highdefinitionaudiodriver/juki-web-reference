@@ -358,16 +358,114 @@ public class TransactionController {
         return ResponseEntity.status(201).body(tx);
     }
 
+    /**
+     * 出生連動: 戸籍からの出生通知を受け、親の世帯に新生児を登録する。
+     * 入力:
+     *   - parentResidentId: 親（同一世帯に既に在籍する世帯員 ID）
+     *   - eventDate: 出生日
+     *   - familyNameKanji / givenNameKanji / familyNameKana / givenNameKana
+     *   - sex: M / F / U
+     *   - relationToHead: 「子」「孫」等。省略時は「子」
+     */
     @PostMapping("/birth")
-    public ResponseEntity<Map<String, Object>> birth(@RequestBody(required = false) Map<String, Object> body) {
-        return ResponseEntity.status(201).body(stub("BIRTH"));
+    @Transactional
+    public ResponseEntity<Map<String, Object>> birth(@RequestBody Map<String, Object> body) {
+        String parentResidentId = string(body.get("parentResidentId"), null);
+        if (parentResidentId == null || parentResidentId.isBlank()) {
+            return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "parentResidentId は必須です。"));
+        }
+        Map<String, Object> parent;
+        try {
+            parent = jdbc.queryForMap(
+                "select household_id, address_code, address_text from resident where resident_id = ? and moved_out_date is null",
+                parentResidentId);
+        } catch (EmptyResultDataAccessException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("PARENT_NOT_FOUND", "親となる住民が在籍中で見つかりません。"));
+        }
+        LocalDate eventDate = LocalDate.parse(string(body.get("eventDate"), LocalDate.now().toString()));
+        String familyKanji = string(body.get("familyNameKanji"), null);
+        String givenKanji = string(body.get("givenNameKanji"), null);
+        if (familyKanji == null || givenKanji == null || familyKanji.isBlank() || givenKanji.isBlank()) {
+            return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "familyNameKanji / givenNameKanji は必須です。"));
+        }
+        String sex = string(body.get("sex"), "U");
+        if (!"M".equals(sex) && !"F".equals(sex) && !"U".equals(sex)) {
+            return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "sex は M / F / U のいずれかです。"));
+        }
+        String householdId = String.valueOf(parent.get("household_id"));
+        String residentId = "B" + System.currentTimeMillis();
+        jdbc.update("""
+            insert into resident
+              (resident_id, household_id, family_name_kanji, given_name_kanji, family_name_kana, given_name_kana,
+               birth_date, sex, address_code, address_text, moved_in_date, restricted_flag, valid_from)
+            values (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, false, ?)
+            """, residentId, householdId, familyKanji, givenKanji,
+            string(body.get("familyNameKana"), ""), string(body.get("givenNameKana"), ""),
+            eventDate, sex, string(parent.get("address_code"), ""), string(parent.get("address_text"), ""),
+            eventDate, OffsetDateTime.now());
+        jdbc.update("""
+            insert into household_member (household_id, resident_id, relation_to_head, joined_date)
+            values (?, ?, ?, ?)
+            """, householdId, residentId, string(body.get("relationToHead"), "子"), eventDate);
+        Map<String, Object> tx = insertTransaction("BIRTH", residentId, householdId, "BIRTH", eventDate, null);
+        events.publishEvent(new ResidentChangedEvent(residentId, (String) tx.get("transactionId"), "BIRTH"));
+        tx.put("parentResidentId", parentResidentId);
+        return ResponseEntity.status(201).body(tx);
     }
 
+    /**
+     * 死亡連動: 戸籍からの死亡通知を受け、対象者を消除する。
+     * - moved_out_date を死亡日に設定（除票化）
+     * - 対象が世帯主だった場合は世帯主未設定とし、別途 HEAD_CHANGE 推奨アラートを返す
+     * 入力:
+     *   - residentId: 死亡者
+     *   - eventDate: 死亡年月日
+     */
     @PostMapping("/death")
-    public ResponseEntity<Map<String, Object>> death(@RequestBody(required = false) Map<String, Object> body) {
-        return ResponseEntity.status(201).body(stub("DEATH"));
+    @Transactional
+    public ResponseEntity<Map<String, Object>> death(@RequestBody Map<String, Object> body) {
+        String residentId = string(body.get("residentId"), null);
+        if (residentId == null || residentId.isBlank()) {
+            return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "residentId は必須です。"));
+        }
+        Map<String, Object> target;
+        try {
+            target = jdbc.queryForMap(
+                "select household_id, moved_out_date from resident where resident_id = ?", residentId);
+        } catch (EmptyResultDataAccessException e) {
+            return ResponseEntity.status(HttpStatus.NOT_FOUND).body(error("NOT_FOUND", "対象住民が見つかりません。"));
+        }
+        if (target.get("moved_out_date") != null) {
+            return ResponseEntity.status(HttpStatus.CONFLICT).body(error("ALREADY_REMOVED", "既に除票済みです。"));
+        }
+        LocalDate eventDate = LocalDate.parse(string(body.get("eventDate"), LocalDate.now().toString()));
+        String householdId = String.valueOf(target.get("household_id"));
+        jdbc.update("update resident set moved_out_date = ?, valid_to = ? where resident_id = ?",
+            eventDate, OffsetDateTime.now(), residentId);
+        jdbc.update("update household_member set left_date = ? where household_id = ? and resident_id = ? and left_date is null",
+            eventDate, householdId, residentId);
+        // 世帯主だった場合は household.head_resident_id をクリア
+        Integer wasHead = jdbc.queryForObject(
+            "select count(*) from household where household_id = ? and head_resident_id = ?",
+            Integer.class, householdId, residentId);
+        boolean alertHeadChange = false;
+        if (wasHead != null && wasHead > 0) {
+            jdbc.update("update household set head_resident_id = null where household_id = ?", householdId);
+            alertHeadChange = true;
+        }
+        Map<String, Object> tx = insertTransaction("DEATH", residentId, householdId, "DEATH", eventDate, null);
+        events.publishEvent(new ResidentChangedEvent(residentId, (String) tx.get("transactionId"), "DEATH"));
+        if (alertHeadChange) {
+            tx.put("alert", Map.of("code", "HEAD_CHANGE_REQUIRED",
+                "message", "世帯主が死亡しました。後継世帯主を HEAD_CHANGE で指定してください。"));
+        }
+        return ResponseEntity.status(201).body(tx);
     }
 
+    /**
+     * 戸籍異動連動の汎用受付（婚姻・離婚・養子縁組 等）。
+     * 戸籍側 ID と reasonCode を受け、住民票記載を変更する。詳細は今後実装。
+     */
     @PostMapping("/koseki")
     public ResponseEntity<Map<String, Object>> koseki(@RequestBody(required = false) Map<String, Object> body) {
         return ResponseEntity.status(201).body(stub("KOSEKI"));

@@ -20,7 +20,7 @@ export type Restriction = Schemas["Restriction"];
 export type ForeignerInfo = Schemas["ForeignerInfo"];
 export type AliasName = Schemas["AliasName"];
 
-export type ViewId = "search" | "resident" | "move" | "certificate" | "reports" | "admin";
+export type ViewId = "search" | "resident" | "move" | "certificate" | "restriction" | "reports" | "admin";
 
 export type SearchCriteria = {
   name: string;

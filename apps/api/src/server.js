@@ -332,6 +332,69 @@ async function handleApi(req, res, reqUrl) {
     return json(res, 201, { ...tx, certificate });
   }
 
+  // 出生連動: 親の世帯に新生児を登録
+  if (req.method === "POST" && path === "/transactions/birth") {
+    if (!canAction(user, "TRANSACTION") && !canAction(user, "MOVE_IN_APPLY")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    if (!body.parentResidentId) return json(res, 400, { code: "VALIDATION_ERROR", message: "parentResidentId は必須です。" });
+    const parent = state.residents.find((r) => r.residentId === body.parentResidentId && !r.movedOutDate);
+    if (!parent) return json(res, 404, { code: "PARENT_NOT_FOUND", message: "親となる住民が在籍中で見つかりません。" });
+    if (!body.familyNameKanji || !body.givenNameKanji) {
+      return json(res, 400, { code: "VALIDATION_ERROR", message: "familyNameKanji / givenNameKanji は必須です。" });
+    }
+    const eventDate = body.eventDate || new Date().toISOString().slice(0, 10);
+    const sex = body.sex || "U";
+    if (!["M", "F", "U"].includes(sex)) {
+      return json(res, 400, { code: "VALIDATION_ERROR", message: "sex は M / F / U のいずれかです。" });
+    }
+    const residentId = `B${String(state.residents.length + 1).padStart(9, "0")}`;
+    const baby = {
+      residentId,
+      householdId: parent.householdId,
+      familyNameKanji: body.familyNameKanji,
+      givenNameKanji: body.givenNameKanji,
+      familyNameKana: body.familyNameKana || "",
+      givenNameKana: body.givenNameKana || "",
+      birthDate: eventDate,
+      sex,
+      addressCode: parent.addressCode,
+      addressText: parent.addressText,
+      relationToHead: body.relationToHead || "子",
+      movedInDate: eventDate,
+      movedOutDate: null,
+      juminCode: "00000000000",
+      myNumber: "000000000000",
+      nationality: parent.nationality,
+      foreigner: null,
+      alias: [],
+      restrictions: [],
+      validFrom: `${eventDate}T00:00:00+09:00`,
+      validTo: null,
+    };
+    state.residents.push(baby);
+    const tx = createTransaction("BIRTH", baby, "BIRTH", eventDate, [{ field: "resident", valueBefore: null, valueAfter: residentId }]);
+    tx.status = "APPLIED";
+    tx.parentResidentId = body.parentResidentId;
+    audit(user, "CREATE", "TRANSACTION", tx.transactionId, { type: "BIRTH", parent: body.parentResidentId });
+    return json(res, 201, tx);
+  }
+
+  // 死亡連動: 対象者を消除
+  if (req.method === "POST" && path === "/transactions/death") {
+    if (!canAction(user, "TRANSACTION") && !canAction(user, "MOVE_OUT_APPLY")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    if (!body.residentId) return json(res, 400, { code: "VALIDATION_ERROR", message: "residentId は必須です。" });
+    const target = state.residents.find((r) => r.residentId === body.residentId);
+    if (!target) return json(res, 404, { code: "NOT_FOUND", message: "対象住民が見つかりません。" });
+    if (target.movedOutDate) return json(res, 409, { code: "ALREADY_REMOVED", message: "既に除票済みです。" });
+    const eventDate = body.eventDate || new Date().toISOString().slice(0, 10);
+    target.movedOutDate = eventDate;
+    const tx = createTransaction("DEATH", target, "DEATH", eventDate, [{ field: "movedOutDate", valueBefore: null, valueAfter: eventDate }]);
+    tx.status = "APPLIED";
+    audit(user, "UPDATE", "TRANSACTION", tx.transactionId, { type: "DEATH", residentId: target.residentId });
+    return json(res, 201, tx);
+  }
+
   if (req.method === "POST" && path === "/transactions/cancel") {
     if (!canAction(user, "CANCEL") && !canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
     const body = await readBody(req);

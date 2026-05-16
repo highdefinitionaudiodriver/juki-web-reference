@@ -15,12 +15,14 @@ import { MoveView } from "./views/MoveView";
 import { CertificateView } from "./views/CertificateView";
 import { ReportsView } from "./views/ReportsView";
 import { AdminView } from "./views/AdminView";
+import { RestrictionView } from "./views/RestrictionView";
 
 const NAV: Array<[ViewId, string]> = [
   ["search", "住民検索"],
   ["resident", "住民票"],
   ["move", "異動"],
   ["certificate", "証明発行"],
+  ["restriction", "抑止設定"],
   ["reports", "統計/EUC"],
   ["admin", "権限/監査"],
 ];
@@ -157,6 +159,29 @@ export function App() {
                 ? `EUC依頼を保留しました。二段階承認が必要です: ${job.jobId}`
                 : `EUC結果を作成しました: ${job.resultUrl}`
             );
+          }}
+        />
+      )}
+      {view === "restriction" && (
+        <RestrictionView
+          resident={selected}
+          onCreate={async (body) => {
+            try {
+              await api.createRestriction(body);
+              notify(`抑止を登録しました: ${body.residentId} / ${body.category}`);
+              if (selected?.residentId) await selectResident(selected.residentId, false);
+            } catch (e) {
+              setNotice({ kind: "err", message: `抑止登録に失敗しました: ${String(e)}` });
+            }
+          }}
+          onDelete={async (id) => {
+            try {
+              await api.deleteRestriction(id);
+              notify(`抑止を解除しました: ${id}`);
+              if (selected?.residentId) await selectResident(selected.residentId, false);
+            } catch (e) {
+              setNotice({ kind: "err", message: `抑止解除に失敗しました: ${String(e)}` });
+            }
           }}
         />
       )}

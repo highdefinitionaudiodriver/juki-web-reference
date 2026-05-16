@@ -73,4 +73,25 @@ export const api = {
   async audit(): Promise<AuditLog[]> {
     try { return await request<AuditLog[]>("/audit"); } catch { return fallbackAuditLogs; }
   },
+  createRestriction: (body: {
+    residentId: string;
+    category: string;
+    startDate: string;
+    endDate?: string | null;
+    scope: string;
+    note?: string;
+  }) => request<{ id: string }>("/restrictions", { method: "POST", body: body as unknown as BodyInit }),
+  deleteRestriction: (id: string) => request<null>(`/restrictions/${id}`, { method: "DELETE" }),
+  birth: (body: {
+    parentResidentId: string;
+    eventDate?: string;
+    familyNameKanji: string;
+    givenNameKanji: string;
+    familyNameKana?: string;
+    givenNameKana?: string;
+    sex?: "M" | "F" | "U";
+    relationToHead?: string;
+  }) => request<Transaction & { parentResidentId: string }>("/transactions/birth", { method: "POST", body: body as unknown as BodyInit }),
+  death: (body: { residentId: string; eventDate?: string }) =>
+    request<Transaction>("/transactions/death", { method: "POST", body: body as unknown as BodyInit }),
 };

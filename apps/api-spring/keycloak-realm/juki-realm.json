@@ -1,0 +1,86 @@
+{
+  "realm": "juki",
+  "enabled": true,
+  "displayName": "住民記録システム dev realm",
+  "registrationAllowed": false,
+  "resetPasswordAllowed": true,
+  "rememberMe": true,
+  "accessTokenLifespan": 3600,
+  "sslRequired": "none",
+  "roles": {
+    "realm": [
+      { "name": "WINDOW",              "description": "窓口担当（住民検索・証明発行）" },
+      { "name": "REVIEW",              "description": "異動審査（届出・職権起票）" },
+      { "name": "RESTRICTION_RELEASE", "description": "DV 等抑止対象の閲覧／登録／解除" },
+      { "name": "ADMIN",               "description": "システム管理者（全権）" }
+    ]
+  },
+  "users": [
+    {
+      "username": "window",
+      "enabled": true,
+      "firstName": "窓口",
+      "lastName": "太郎",
+      "email": "window@example.go.jp",
+      "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
+      "realmRoles": [ "WINDOW" ]
+    },
+    {
+      "username": "review",
+      "enabled": true,
+      "firstName": "審査",
+      "lastName": "花子",
+      "email": "review@example.go.jp",
+      "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
+      "realmRoles": [ "WINDOW", "REVIEW" ]
+    },
+    {
+      "username": "admin-user",
+      "enabled": true,
+      "firstName": "管理",
+      "lastName": "次郎",
+      "email": "admin-user@example.go.jp",
+      "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
+      "realmRoles": [ "ADMIN", "RESTRICTION_RELEASE", "REVIEW", "WINDOW" ]
+    }
+  ],
+  "clients": [
+    {
+      "clientId": "juki-web",
+      "name": "住民記録 Web 版",
+      "enabled": true,
+      "publicClient": true,
+      "standardFlowEnabled": true,
+      "directAccessGrantsEnabled": true,
+      "redirectUris": [
+        "http://localhost:5173/*",
+        "http://localhost:8787/*",
+        "http://localhost:8788/*"
+      ],
+      "webOrigins": [
+        "http://localhost:5173",
+        "http://localhost:8787",
+        "http://localhost:8788"
+      ],
+      "attributes": {
+        "post.logout.redirect.uris": "http://localhost:5173/*"
+      },
+      "protocolMappers": [
+        {
+          "name": "realm-roles-to-roles",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-realm-role-mapper",
+          "consentRequired": false,
+          "config": {
+            "claim.name": "roles",
+            "jsonType.label": "String",
+            "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        }
+      ]
+    }
+  ]
+}

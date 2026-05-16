@@ -126,6 +126,70 @@ test("DV 抑止対象者の詳細・履歴は WINDOW ロールから 404", async
   expect(releaseHistory.status()).toBe(200);
 });
 
+test("出生連動: 親世帯に新生児を登録", async ({ request }) => {
+  const reviewHeaders = headers(["REVIEW", "ADMIN"]);
+  const eventDate = new Date().toISOString().slice(0, 10);
+  // 親は seed の 0000123456 (住民 太郎)
+  const res = await request.post("/api/v1/transactions/birth", {
+    headers: reviewHeaders,
+    data: {
+      parentResidentId: "0000123456",
+      eventDate,
+      familyNameKanji: "住民",
+      givenNameKanji: "新太",
+      familyNameKana: "ジュウミン",
+      givenNameKana: "シンタ",
+      sex: "M",
+      relationToHead: "子",
+    },
+  });
+  expect(res.status()).toBe(201);
+  const tx = await res.json();
+  expect(tx.typeCode).toBe("BIRTH");
+  expect(tx.status).toBe("APPLIED");
+  expect(tx.parentResidentId).toBe("0000123456");
+  expect(tx.householdId).toBe("H-00045");
+
+  // バリデーション: 親が存在しない
+  const badParent = await request.post("/api/v1/transactions/birth", {
+    headers: reviewHeaders,
+    data: { parentResidentId: "9999999999", familyNameKanji: "X", givenNameKanji: "Y" },
+  });
+  expect(badParent.status()).toBe(404);
+});
+
+test("死亡連動: 消除 + 重複死亡で 409", async ({ request }) => {
+  const reviewHeaders = headers(["REVIEW", "ADMIN"]);
+  // 出生で作った新生児はテスト独立性のため使えないので、転入で新規作成
+  const moveIn = await request.post("/api/v1/transactions/in", {
+    headers: reviewHeaders,
+    data: {
+      eventDate: "2024-01-01",
+      members: [{ familyNameKanji: "死亡", givenNameKanji: "テスト", birthDate: "1950-01-01", sex: "M", relationToHead: "本人" }],
+    },
+  });
+  const mi = await moveIn.json();
+  const residentId = mi.residentId;
+
+  // 1 回目 OK
+  const first = await request.post("/api/v1/transactions/death", {
+    headers: reviewHeaders,
+    data: { residentId, eventDate: "2026-05-16" },
+  });
+  expect(first.status()).toBe(201);
+  const tx = await first.json();
+  expect(tx.typeCode).toBe("DEATH");
+
+  // 2 回目は 409 (既に除票済)
+  const second = await request.post("/api/v1/transactions/death", {
+    headers: reviewHeaders,
+    data: { residentId, eventDate: "2026-05-16" },
+  });
+  expect(second.status()).toBe(409);
+  const err = await second.json();
+  expect(err.code).toBe("ALREADY_REMOVED");
+});
+
 test("個人番号は WINDOW ロールではマスク, ADMIN+unmask で平文", async ({ request }) => {
   const masked = await request.get("/api/v1/residents/0000123456", { headers: headers(["WINDOW"]) });
   const mJson = await masked.json();

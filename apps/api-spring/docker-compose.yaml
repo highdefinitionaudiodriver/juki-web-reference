@@ -10,6 +10,34 @@ services:
       - "5432:5432"
     volumes:
       - resident_pg:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U resident -d resident"]
+      interval: 5s
+      timeout: 5s
+      retries: 10
+
+  # 開発用 OIDC IdP。Spring 側 application.yaml の OIDC_ISSUER を
+  #   http://localhost:8080/realms/juki に向けると本物の OIDC が回る。
+  # 初回起動:
+  #   docker compose up -d keycloak
+  #   ブラウザで http://localhost:8080 → admin / admin でログイン
+  #   realm "juki" を作成し、client "juki-web" を作成 (Confidential / standard flow)
+  #   ユーザを作成し、roles に "WINDOW" "REVIEW" "RESTRICTION_RELEASE" "ADMIN" を Realm Role として割当
+  #   Client Scope で "roles" mapper を Token Claim Name = "roles" として追加
+  keycloak:
+    image: quay.io/keycloak/keycloak:25.0
+    container_name: resident-keycloak
+    command: ["start-dev", "--import-realm"]
+    environment:
+      KEYCLOAK_ADMIN: admin
+      KEYCLOAK_ADMIN_PASSWORD: admin
+      KC_HEALTH_ENABLED: "true"
+    ports:
+      - "8080:8080"
+    volumes:
+      - ./keycloak-realm:/opt/keycloak/data/import:ro
+      - keycloak_data:/opt/keycloak/data
 
 volumes:
   resident_pg: {}
+  keycloak_data: {}
