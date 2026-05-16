@@ -7,6 +7,10 @@ import type {
   CertificateReq,
   EucAsyncJob,
   EucQueryReq,
+  ForeignerExpiryJob,
+  ForeignerExpiryReportReq,
+  ForeignerInfo,
+  ForeignerUpdateResult,
   Me,
   MoveInReq,
   MoveOutReq,
@@ -73,7 +77,11 @@ export const api = {
   issueJuminCode: (body: JuminCodeReq) => request<CodeIssueResult>("/codes/jumin", { method: "POST", body: body as unknown as BodyInit }),
   issueMyNumber: (body: MyNumberReq) => request<CodeIssueResult>("/codes/mynumber", { method: "POST", body: body as unknown as BodyInit }),
   issueCertificate: (body: CertificateReq) => request<CertificateIssue>("/certificates/jumin", { method: "POST", body: body as unknown as BodyInit }),
+  updateForeigner: (residentId: string, body: ForeignerInfo) =>
+    request<ForeignerUpdateResult>(`/residents/${residentId}/foreigner`, { method: "PUT", body: body as unknown as BodyInit }),
   annualReport: (body: ReportReq) => request<AsyncJob>("/reports/annual", { method: "POST", body: body as unknown as BodyInit }),
+  foreignerExpiryReport: (body: ForeignerExpiryReportReq) =>
+    request<ForeignerExpiryJob>("/reports/foreigner-expiring", { method: "POST", body: body as unknown as BodyInit }),
   eucQuery: (body: EucQueryReq) => request<EucAsyncJob>("/euc/query", { method: "POST", body: body as unknown as BodyInit }),
   async audit(): Promise<AuditLog[]> {
     try { return await request<AuditLog[]>("/audit"); } catch { return fallbackAuditLogs; }

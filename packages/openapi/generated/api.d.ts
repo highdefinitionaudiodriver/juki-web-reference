@@ -776,7 +776,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["ForeignerUpdateResult"];
+                    };
                 };
             };
         };
@@ -1183,6 +1185,46 @@ export interface paths {
                         [name: string]: unknown;
                     };
                     content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/reports/foreigner-expiring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 在留期間満了 30 日前抽出・通知票発行（0010012） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["ForeignerExpiryReportReq"];
+                };
+            };
+            responses: {
+                /** @description 受付（対象者へ 0010012 を発行） */
+                202: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ForeignerExpiryJob"];
+                    };
                 };
             };
         };
@@ -1676,12 +1718,16 @@ export interface components {
         ForeignerInfo: {
             residenceStatus?: string;
             /** Format: date */
-            residencePeriodEnd?: string;
+            residencePeriodEnd: string;
             passportNo?: string;
             nationalityFull?: string;
             /** @description 通称 */
             aliasKanji?: string;
             specialPermanentResident?: boolean;
+        };
+        ForeignerUpdateResult: components["schemas"]["ForeignerInfo"] & {
+            residentId?: string;
+            expiresWithin30Days?: boolean;
         };
         AliasName: {
             /** @enum {string} */
@@ -1809,7 +1855,7 @@ export interface components {
         CertificateReq: {
             residentId: string;
             /** @enum {string} */
-            formId: "0010001" | "0010002" | "0010003" | "0010004" | "0010005" | "0010007" | "0010008" | "0010009" | "0010010" | "0010011";
+            formId: "0010001" | "0010002" | "0010003" | "0010004" | "0010005" | "0010007" | "0010008" | "0010009" | "0010010" | "0010011" | "0010012";
             /** @enum {string} */
             scope?: "SELF" | "HOUSEHOLD" | "MEMBERS";
             showJuminCode?: boolean;
@@ -1885,6 +1931,21 @@ export interface components {
             /** Format: uri */
             resultUrl?: string | null;
             error?: string | null;
+        };
+        ForeignerExpiryReportReq: {
+            /** Format: date */
+            baseDate?: string;
+            /** @default 30 */
+            days: number;
+        };
+        ForeignerExpiryJob: components["schemas"]["AsyncJob"] & {
+            /** Format: date */
+            baseDate?: string;
+            days?: number;
+            targetCount?: number;
+            issuedCount?: number;
+            /** @enum {string} */
+            formId?: "0010012";
         };
         AuditLog: {
             logId?: number;

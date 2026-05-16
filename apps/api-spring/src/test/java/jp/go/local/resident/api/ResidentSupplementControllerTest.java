@@ -7,6 +7,7 @@ import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -86,6 +87,35 @@ class ResidentSupplementControllerTest {
                     """))
             .andExpect(status().isBadRequest())
             .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void foreigner_requiresResidencePeriodEnd_400() throws Exception {
+        mvc.perform(put("/api/v1/residents/R001/foreigner")
+                .with(jwt().jwt(j -> j.claim("roles", java.util.List.of("ADMIN"))))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"residenceStatus":"技術・人文知識・国際業務"}
+                    """))
+            .andExpect(status().isBadRequest())
+            .andExpect(jsonPath("$.code").value("VALIDATION_ERROR"));
+    }
+
+    @Test
+    void foreigner_updatesAndFlagsWithin30Days() throws Exception {
+        mvc.perform(put("/api/v1/residents/R001/foreigner")
+                .with(jwt().jwt(j -> j.claim("roles", java.util.List.of("ADMIN"))))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {
+                      "residenceStatus":"技術・人文知識・国際業務",
+                      "residencePeriodEnd":"2026-06-01",
+                      "nationalityFull":"中華人民共和国"
+                    }
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.residentId").value("R001"))
+            .andExpect(jsonPath("$.expiresWithin30Days").value(true));
     }
 
     @TestConfiguration

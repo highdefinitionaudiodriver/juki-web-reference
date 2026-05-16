@@ -201,7 +201,10 @@ paths:
       summary: 外国人住民 在留情報更新（4.5）
       parameters: [ { name: residentId, in: path, required: true, schema: { type: string } } ]
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/ForeignerInfo' } } } }
-      responses: { '200': { description: OK } }
+      responses:
+        '200':
+          description: OK
+          content: { application/json: { schema: { $ref: '#/components/schemas/ForeignerUpdateResult' } } }
 
   # ===== 証明 =====
   /certificates/jumin:
@@ -273,6 +276,15 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/AsyncJob' } } }
   /reports/population:
     post: { tags: [reports], summary: 人口動態, responses: { '202': { description: 受付 } } }
+  /reports/foreigner-expiring:
+    post:
+      tags: [reports]
+      summary: 在留期間満了 30 日前抽出・通知票発行（0010012）
+      requestBody: { required: false, content: { application/json: { schema: { $ref: '#/components/schemas/ForeignerExpiryReportReq' } } } }
+      responses:
+        '202':
+          description: 受付（対象者へ 0010012 を発行）
+          content: { application/json: { schema: { $ref: '#/components/schemas/ForeignerExpiryJob' } } }
   /reports/{jobId}:
     get:
       tags: [reports]
@@ -440,6 +452,7 @@ components:
 
     ForeignerInfo:
       type: object
+      required: [residencePeriodEnd]
       properties:
         residenceStatus:        { type: string }
         residencePeriodEnd:     { type: string, format: date }
@@ -447,6 +460,14 @@ components:
         nationalityFull:        { type: string }
         aliasKanji:             { type: string, description: 通称 }
         specialPermanentResident: { type: boolean }
+
+    ForeignerUpdateResult:
+      allOf:
+        - $ref: '#/components/schemas/ForeignerInfo'
+        - type: object
+          properties:
+            residentId: { type: string }
+            expiresWithin30Days: { type: boolean }
 
     AliasName:
       type: object
@@ -584,7 +605,7 @@ components:
       required: [residentId, formId]
       properties:
         residentId:         { type: string }
-        formId:             { type: string, enum: ["0010001", "0010002", "0010003", "0010004", "0010005", "0010007", "0010008", "0010009", "0010010", "0010011"] }
+        formId:             { type: string, enum: ["0010001", "0010002", "0010003", "0010004", "0010005", "0010007", "0010008", "0010009", "0010010", "0010011", "0010012"] }
         scope:              { type: string, enum: [SELF, HOUSEHOLD, MEMBERS] }
         showJuminCode:      { type: boolean }
         showMyNumber:       { type: boolean }
@@ -656,6 +677,23 @@ components:
         progress:  { type: integer, minimum: 0, maximum: 100 }
         resultUrl: { type: string, format: uri, nullable: true }
         error:     { type: string, nullable: true }
+
+    ForeignerExpiryReportReq:
+      type: object
+      properties:
+        baseDate: { type: string, format: date }
+        days:     { type: integer, default: 30 }
+
+    ForeignerExpiryJob:
+      allOf:
+        - $ref: '#/components/schemas/AsyncJob'
+        - type: object
+          properties:
+            baseDate:    { type: string, format: date }
+            days:        { type: integer }
+            targetCount: { type: integer }
+            issuedCount: { type: integer }
+            formId:      { type: string, enum: ["0010012"] }
 
     AuditLog:
       type: object

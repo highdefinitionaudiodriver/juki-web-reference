@@ -40,7 +40,14 @@ public class ResidentSupplementController {
     }
 
     @PutMapping("/residents/{residentId}/foreigner")
-    public Map<String, Object> foreigner(@PathVariable String residentId, @RequestBody Map<String, Object> body) {
+    @Transactional
+    public ResponseEntity<Map<String, Object>> foreigner(@PathVariable String residentId, @RequestBody Map<String, Object> body) {
+        ResponseEntity<Map<String, Object>> residentError = ensureResidentExists(residentId);
+        if (residentError != null) return residentError;
+        LocalDate periodEnd = nullableDate(body.get("residencePeriodEnd"));
+        if (periodEnd == null) {
+            return ResponseEntity.badRequest().body(error("VALIDATION_ERROR", "residencePeriodEnd は必須です。"));
+        }
         jdbc.update("""
             insert into resident_foreigner
               (resident_id, residence_status, residence_period_end, passport_no, nationality_full, alias_kanji, special_permanent_resident)
@@ -52,12 +59,16 @@ public class ResidentSupplementController {
               nationality_full = excluded.nationality_full,
               alias_kanji = excluded.alias_kanji,
               special_permanent_resident = excluded.special_permanent_resident
-            """, residentId, string(body.get("residenceStatus"), ""), nullableDate(body.get("residencePeriodEnd")),
+            """, residentId, string(body.get("residenceStatus"), ""), periodEnd,
             string(body.get("passportNo"), ""), string(body.get("nationalityFull"), ""),
             string(body.get("aliasKanji"), ""), Boolean.TRUE.equals(body.get("specialPermanentResident")));
+        jdbc.update("update resident set nationality = ? where resident_id = ?",
+            string(body.get("nationalityFull"), ""), residentId);
         Map<String, Object> response = new LinkedHashMap<>(body);
         response.put("residentId", residentId);
-        return response;
+        response.put("residencePeriodEnd", periodEnd.toString());
+        response.put("expiresWithin30Days", !periodEnd.isAfter(LocalDate.now().plusDays(30)));
+        return ResponseEntity.ok(response);
     }
 
     @PostMapping("/codes/jumin")

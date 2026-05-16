@@ -22,6 +22,7 @@ const FORM_TITLE: Record<string, string> = {
   "0010009": "住民票コード通知票",
   "0010010": "個人番号通知票",
   "0010011": "住民票コード・個人番号変更通知票",
+  "0010012": "在留期間満了事前通知票",
 };
 
 function formatWareki(dateStr?: string | null): string {

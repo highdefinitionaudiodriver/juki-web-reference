@@ -199,6 +199,54 @@ function handleCodeOperation(user, resident, field, body) {
   return { status: 201, body: { residentId: resident.residentId, operation, [field]: value, certificate } };
 }
 
+function updateForeignerInfo(resident, body) {
+  if (!body.residencePeriodEnd) {
+    return { status: 400, body: { code: "VALIDATION_ERROR", message: "residencePeriodEnd は必須です。" } };
+  }
+  const info = {
+    residenceStatus: body.residenceStatus || "",
+    residencePeriodEnd: body.residencePeriodEnd,
+    passportNo: body.passportNo || "",
+    nationalityFull: body.nationalityFull || "",
+    aliasKanji: body.aliasKanji || "",
+    specialPermanentResident: Boolean(body.specialPermanentResident),
+  };
+  resident.foreigner = info;
+  resident.nationality = info.nationalityFull || resident.nationality;
+  const diffDays = Math.ceil((Date.parse(info.residencePeriodEnd) - Date.now()) / 86400000);
+  return {
+    status: 200,
+    body: { residentId: resident.residentId, ...info, expiresWithin30Days: diffDays <= 30 },
+  };
+}
+
+function issueForeignerExpiryNotices(user, body = {}) {
+  const baseDate = body.baseDate || new Date().toISOString().slice(0, 10);
+  const days = Number(body.days || 30);
+  const start = Date.parse(baseDate);
+  const end = start + days * 86400000;
+  const targets = state.residents.filter((resident) => {
+    if (resident.movedOutDate || !resident.foreigner?.residencePeriodEnd) return false;
+    const expiry = Date.parse(resident.foreigner.residencePeriodEnd);
+    return expiry >= start && expiry <= end;
+  });
+  for (const resident of targets) {
+    issueCertificate(user, resident.residentId, "0010012", 1, "在留期間満了事前通知");
+  }
+  return {
+    jobId: `FOREIGNER-${Date.now()}`,
+    status: "DONE",
+    progress: 100,
+    resultUrl: null,
+    error: null,
+    baseDate,
+    days,
+    targetCount: targets.length,
+    issuedCount: targets.length,
+    formId: "0010012",
+  };
+}
+
 function minimalCertificatePdf(issue) {
   const lines = [
     "Resident Record Certificate",
@@ -322,6 +370,17 @@ async function handleApi(req, res, reqUrl) {
       return json(res, 404, { code: "NOT_FOUND", message: "該当する住民はありません。" });
     }
     return json(res, 200, state.transactions.filter((tx) => tx.residentId === historyMatch[1]));
+  }
+
+  const foreignerMatch = path.match(/^\/residents\/([^/]+)\/foreigner$/);
+  if (foreignerMatch && req.method === "PUT") {
+    if (!canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const resident = state.residents.find((item) => item.residentId === foreignerMatch[1]);
+    if (!resident) return json(res, 404, { code: "NOT_FOUND", message: "対象住民が見つかりません。" });
+    const result = updateForeignerInfo(resident, body);
+    if (result.status === 200) audit(user, "UPDATE", "FOREIGNER", resident.residentId, result.body);
+    return json(res, result.status, result.body);
   }
 
   if (req.method === "POST" && path === "/transactions/in") {
@@ -506,6 +565,15 @@ async function handleApi(req, res, reqUrl) {
     const body = await readBody(req);
     const job = { jobId: `JOB-${Date.now()}`, status: "DONE", progress: 100, resultUrl: `/reports/${body.templateId || "annual"}.xlsx`, error: null };
     state.jobs.unshift(job);
+    return json(res, 202, job);
+  }
+
+  if (req.method === "POST" && path === "/reports/foreigner-expiring") {
+    if (!canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const job = issueForeignerExpiryNotices(user, body);
+    state.jobs.unshift(job);
+    audit(user, "ISSUE", "FOREIGNER_EXPIRY_NOTICE", "*", { targetCount: job.targetCount });
     return json(res, 202, job);
   }
 

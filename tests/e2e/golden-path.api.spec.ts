@@ -246,3 +246,33 @@ test("住民票コード/個人番号の付番変更で通知票を発行", asyn
   expect(myNumberChangeJson.myNumber).toBe("523456789012");
   expect(myNumberChangeJson.certificate.formId).toBe("0010011");
 });
+
+test("外国人在留情報更新と満了30日前通知票発行", async ({ request }) => {
+  const reviewHeaders = headers(["REVIEW", "ADMIN"]);
+  const target = "0000124000";
+  const update = await request.put(`/api/v1/residents/${target}/foreigner`, {
+    headers: reviewHeaders,
+    data: {
+      residenceStatus: "技術・人文知識・国際業務",
+      residencePeriodEnd: "2026-06-01",
+      passportNo: "P99999999",
+      nationalityFull: "中華人民共和国",
+      aliasKanji: "王 明",
+      specialPermanentResident: false,
+    },
+  });
+  expect(update.status()).toBe(200);
+  const updated = await update.json();
+  expect(updated.residentId).toBe(target);
+  expect(updated.expiresWithin30Days).toBe(true);
+
+  const job = await request.post("/api/v1/reports/foreigner-expiring", {
+    headers: reviewHeaders,
+    data: { baseDate: "2026-05-16", days: 30 },
+  });
+  expect(job.status()).toBe(202);
+  const jobJson = await job.json();
+  expect(jobJson.formId).toBe("0010012");
+  expect(jobJson.targetCount).toBeGreaterThanOrEqual(1);
+  expect(jobJson.issuedCount).toBe(jobJson.targetCount);
+});

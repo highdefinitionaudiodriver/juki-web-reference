@@ -48,7 +48,7 @@
 | `POST /transactions/cancel` | ✓ | ✓ | 二重取消防止 |
 | `POST /codes/jumin` | ✓ | ✓ | 付番/変更/修正 + 通知票 0010009/0010011 |
 | `POST /codes/mynumber` | ✓ | ✓ | 付番/変更/修正 + 通知票 0010010/0010011 |
-| `PUT  /residents/{id}/foreigner` | – | – | 未実装 |
+| `PUT  /residents/{id}/foreigner` | ✓ | ✓ | 在留資格・期限更新、30日前フラグ |
 | `POST /certificates/jumin` | ✓ | ✓ | OpenHTMLtoPDF |
 | `POST /certificates/items` | – | ✓ | form_id 出し分け |
 | `POST /certificates/removed` | – | ✓ | — |
@@ -60,6 +60,7 @@
 | `DELETE /restrictions/{id}` | ✓ | – | Node のみ |
 | `POST /reports/annual` | ✓ | ✓ | スタブ受付 |
 | `POST /reports/population` | – | – | — |
+| `POST /reports/foreigner-expiring` | ✓ | ✓ | 30日前抽出 + 0010012 発行 |
 | `GET  /reports/{jobId}` | – | – | — |
 | `POST /euc/query` | ✓ | ✓ | 二段階承認フラグ |
 | `POST /link/*` | – | – | スケルトン |
@@ -88,9 +89,8 @@
 ## 残作業（優先順）
 
 ### A. 機能拡張
-1. `/residents/{id}/foreigner`：在留資格・在留期間管理、0010012 通知
-2. 連携 9 系統の `/link/*`：CS / 番号 / 戸籍 / 税 / 国保 / 選挙 / 申請管理 / コンビニ / マイナポータル
-3. 残り帳票 (0010002–0010019, 年報) を `CertificatePdfService` の form_id ごとにレイアウト
+1. 連携 9 系統の `/link/*`：CS / 番号 / 戸籍 / 税 / 国保 / 選挙 / 申請管理 / コンビニ / マイナポータル
+2. 残り帳票 (0010002–0010019, 年報) を `CertificatePdfService` の form_id ごとにレイアウト
 
 ### B. 非機能
 1. Keycloak と Spring の実接続テスト（Authorization Code + PKCE）

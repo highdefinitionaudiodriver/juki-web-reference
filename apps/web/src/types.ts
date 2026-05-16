@@ -21,6 +21,9 @@ export type AuditLog = Schemas["AuditLog"];
 export type Me = Schemas["Me"];
 export type Restriction = Schemas["Restriction"];
 export type ForeignerInfo = Schemas["ForeignerInfo"];
+export type ForeignerUpdateResult = Schemas["ForeignerUpdateResult"];
+export type ForeignerExpiryReportReq = Schemas["ForeignerExpiryReportReq"];
+export type ForeignerExpiryJob = Schemas["ForeignerExpiryJob"];
 export type AliasName = Schemas["AliasName"];
 
 export type ViewId = "search" | "resident" | "move" | "certificate" | "restriction" | "reports" | "admin";
