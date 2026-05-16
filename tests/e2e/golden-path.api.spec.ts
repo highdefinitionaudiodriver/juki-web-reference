@@ -276,3 +276,26 @@ test("外国人在留情報更新と満了30日前通知票発行", async ({ req
   expect(jobJson.targetCount).toBeGreaterThanOrEqual(1);
   expect(jobJson.issuedCount).toBe(jobJson.targetCount);
 });
+
+test("戸籍連動受領: /link/internal/koseki から KOSEKI 異動を反映", async ({ request }) => {
+  const reviewHeaders = headers(["REVIEW", "ADMIN"]);
+  const res = await request.post("/api/v1/link/internal/koseki", {
+    headers: reviewHeaders,
+    data: {
+      noticeType: "MARRIAGE",
+      kosekiNoticeId: "KOSEKI-E2E-001",
+      residentId: "0000123456",
+      eventDate: "2026-05-16",
+      newFamilyNameKanji: "連携",
+      newFamilyNameKana: "レンケイ",
+    },
+  });
+  expect(res.status()).toBe(201);
+  const body = await res.json();
+  expect(body.partnerId).toBe("KOSEKI");
+  expect(body.status).toBe("APPLIED");
+  expect(body.transactionId).toBeTruthy();
+  expect(body.transaction.typeCode).toBe("KOSEKI");
+  expect(body.transaction.reasonCode).toBe("KOSEKI_MARRIAGE");
+  expect(body.transaction.kosekiNoticeId).toBe("KOSEKI-E2E-001");
+});

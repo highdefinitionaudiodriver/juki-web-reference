@@ -303,17 +303,36 @@ paths:
 
   # ===== 連携 =====
   /link/cs/inbound:
-    post: { tags: [link], summary: 住基ネットCS受信, responses: { '202': { description: 受付 } } }
+    post:
+      tags: [link]
+      summary: 住基ネットCS受信
+      responses:
+        '202': { description: 受付, content: { application/json: { schema: { $ref: '#/components/schemas/LinkAcceptResult' } } } }
   /link/number/inbound:
-    post: { tags: [link], summary: 番号連携受信, responses: { '202': { description: 受付 } } }
+    post:
+      tags: [link]
+      summary: 番号連携受信
+      responses:
+        '202': { description: 受付, content: { application/json: { schema: { $ref: '#/components/schemas/LinkAcceptResult' } } } }
   /link/internal/{partner}:
     post:
       tags: [link]
       summary: 庁内他業務（税/国保/選挙 等）
       parameters: [ { name: partner, in: path, required: true, schema: { type: string, enum: [tax, insurance, election, koseki, application] } } ]
-      responses: { '202': { description: 受付 } }
+      requestBody: { required: false, content: { application/json: { schema: { $ref: '#/components/schemas/KosekiLinkReq' } } } }
+      responses:
+        '201':
+          description: 戸籍連動は異動反映済
+          content: { application/json: { schema: { $ref: '#/components/schemas/LinkApplyResult' } } }
+        '202':
+          description: その他庁内連携は受付
+          content: { application/json: { schema: { $ref: '#/components/schemas/LinkAcceptResult' } } }
   /link/application/inbound:
-    post: { tags: [link], summary: 申請管理システム受信, responses: { '202': { description: 受付 } } }
+    post:
+      tags: [link]
+      summary: 申請管理システム受信
+      responses:
+        '202': { description: 受付, content: { application/json: { schema: { $ref: '#/components/schemas/LinkAcceptResult' } } } }
 
   # ===== 管理 =====
   /admin/users:
@@ -694,6 +713,46 @@ components:
             targetCount: { type: integer }
             issuedCount: { type: integer }
             formId:      { type: string, enum: ["0010012"] }
+
+    KosekiLinkReq:
+      type: object
+      properties:
+        noticeType: { type: string, enum: [BIRTH, DEATH, MARRIAGE, DIVORCE, ADOPTION] }
+        kosekiNoticeId: { type: string }
+        residentId: { type: string }
+        parentResidentId: { type: string }
+        eventDate: { type: string, format: date }
+        familyNameKanji: { type: string }
+        givenNameKanji: { type: string }
+        familyNameKana: { type: string }
+        givenNameKana: { type: string }
+        sex: { type: string, enum: [M, F, U] }
+        relationToHead: { type: string }
+        newFamilyNameKanji: { type: string }
+        newFamilyNameKana: { type: string }
+
+    LinkResultBase:
+      type: object
+      properties:
+        eventId: { type: string }
+        partnerId: { type: string }
+        receivedAt: { type: string, format: date-time }
+
+    LinkAcceptResult:
+      allOf:
+        - $ref: '#/components/schemas/LinkResultBase'
+        - type: object
+          properties:
+            status: { type: string, enum: [ACCEPTED] }
+
+    LinkApplyResult:
+      allOf:
+        - $ref: '#/components/schemas/LinkResultBase'
+        - type: object
+          properties:
+            status: { type: string, enum: [APPLIED] }
+            transactionId: { type: string }
+            transaction: { $ref: '#/components/schemas/Transaction' }
 
     AuditLog:
       type: object

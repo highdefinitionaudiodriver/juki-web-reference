@@ -1339,7 +1339,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["LinkAcceptResult"];
+                    };
                 };
             };
         };
@@ -1373,7 +1375,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["LinkAcceptResult"];
+                    };
                 };
             };
         };
@@ -1402,14 +1406,29 @@ export interface paths {
                 };
                 cookie?: never;
             };
-            requestBody?: never;
+            requestBody?: {
+                content: {
+                    "application/json": components["schemas"]["KosekiLinkReq"];
+                };
+            };
             responses: {
-                /** @description 受付 */
+                /** @description 戸籍連動は異動反映済 */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["LinkApplyResult"];
+                    };
+                };
+                /** @description その他庁内連携は受付 */
                 202: {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["LinkAcceptResult"];
+                    };
                 };
             };
         };
@@ -1443,7 +1462,9 @@ export interface paths {
                     headers: {
                         [name: string]: unknown;
                     };
-                    content?: never;
+                    content: {
+                        "application/json": components["schemas"]["LinkAcceptResult"];
+                    };
                 };
             };
         };
@@ -1946,6 +1967,40 @@ export interface components {
             issuedCount?: number;
             /** @enum {string} */
             formId?: "0010012";
+        };
+        KosekiLinkReq: {
+            /** @enum {string} */
+            noticeType?: "BIRTH" | "DEATH" | "MARRIAGE" | "DIVORCE" | "ADOPTION";
+            kosekiNoticeId?: string;
+            residentId?: string;
+            parentResidentId?: string;
+            /** Format: date */
+            eventDate?: string;
+            familyNameKanji?: string;
+            givenNameKanji?: string;
+            familyNameKana?: string;
+            givenNameKana?: string;
+            /** @enum {string} */
+            sex?: "M" | "F" | "U";
+            relationToHead?: string;
+            newFamilyNameKanji?: string;
+            newFamilyNameKana?: string;
+        };
+        LinkResultBase: {
+            eventId?: string;
+            partnerId?: string;
+            /** Format: date-time */
+            receivedAt?: string;
+        };
+        LinkAcceptResult: components["schemas"]["LinkResultBase"] & {
+            /** @enum {string} */
+            status?: "ACCEPTED";
+        };
+        LinkApplyResult: components["schemas"]["LinkResultBase"] & {
+            /** @enum {string} */
+            status?: "APPLIED";
+            transactionId?: string;
+            transaction?: components["schemas"]["Transaction"];
         };
         AuditLog: {
             logId?: number;

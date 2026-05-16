@@ -63,7 +63,8 @@
 | `POST /reports/foreigner-expiring` | ✓ | ✓ | 30日前抽出 + 0010012 発行 |
 | `GET  /reports/{jobId}` | – | – | — |
 | `POST /euc/query` | ✓ | ✓ | 二段階承認フラグ |
-| `POST /link/*` | – | – | スケルトン |
+| `POST /link/internal/koseki` | ✓ | ✓ | 戸籍受領 → BIRTH/DEATH/KOSEKI 反映 |
+| `POST /link/*` | ✓ | ✓ | その他 8 系統は受領ログ |
 | `GET  /audit` | ✓ | ✓ | — |
 | `GET/POST /admin/users` | – | ✓ | スケルトン |
 | `GET/POST /admin/roles` | – | ✓ | スケルトン |
@@ -89,8 +90,8 @@
 ## 残作業（優先順）
 
 ### A. 機能拡張
-1. 連携 9 系統の `/link/*`：CS / 番号 / 戸籍 / 税 / 国保 / 選挙 / 申請管理 / コンビニ / マイナポータル
-2. 残り帳票 (0010002–0010019, 年報) を `CertificatePdfService` の form_id ごとにレイアウト
+1. 残り帳票 (0010002–0010019, 年報) を `CertificatePdfService` の form_id ごとにレイアウト
+2. 連携 9 系統のうち、税 / 国保 / 選挙 / コンビニ / マイナポータルの業務別ペイロード反映
 
 ### B. 非機能
 1. Keycloak と Spring の実接続テスト（Authorization Code + PKCE）

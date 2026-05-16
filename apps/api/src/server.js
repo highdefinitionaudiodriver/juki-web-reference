@@ -16,6 +16,7 @@ const state = {
   transactions: structuredClone(transactions),
   certificates: [],
   auditLogs: structuredClone(auditLogs),
+  linkEvents: [],
   jobs: [],
 };
 
@@ -245,6 +246,87 @@ function issueForeignerExpiryNotices(user, body = {}) {
     issuedCount: targets.length,
     formId: "0010012",
   };
+}
+
+function acceptLinkEvent(partnerId, payload = {}, status = "ACCEPTED", transactionId = null) {
+  const event = {
+    eventId: state.linkEvents.length + 1,
+    partnerId,
+    transactionId,
+    direction: "INBOUND",
+    status,
+    payload,
+    receivedAt: new Date().toISOString(),
+  };
+  state.linkEvents.unshift(event);
+  return event;
+}
+
+function applyKosekiLink(body) {
+  const noticeType = body.noticeType || body.kind;
+  if (!noticeType) return { status: 400, body: { code: "VALIDATION_ERROR", message: "noticeType は必須です。" } };
+  if (noticeType === "BIRTH") {
+    if (!body.parentResidentId) return { status: 400, body: { code: "VALIDATION_ERROR", message: "parentResidentId は必須です。" } };
+    const parent = state.residents.find((r) => r.residentId === body.parentResidentId && !r.movedOutDate);
+    if (!parent) return { status: 404, body: { code: "PARENT_NOT_FOUND", message: "親となる住民が在籍中で見つかりません。" } };
+    const eventDate = body.eventDate || new Date().toISOString().slice(0, 10);
+    const baby = {
+      residentId: `B${String(state.residents.length + 1).padStart(9, "0")}`,
+      householdId: parent.householdId,
+      familyNameKanji: body.familyNameKanji || parent.familyNameKanji,
+      givenNameKanji: body.givenNameKanji || "新生児",
+      familyNameKana: body.familyNameKana || parent.familyNameKana,
+      givenNameKana: body.givenNameKana || "",
+      birthDate: eventDate,
+      sex: body.sex || "U",
+      addressCode: parent.addressCode,
+      addressText: parent.addressText,
+      relationToHead: body.relationToHead || "子",
+      movedInDate: eventDate,
+      movedOutDate: null,
+      juminCode: "00000000000",
+      myNumber: "000000000000",
+      nationality: parent.nationality,
+      foreigner: null,
+      alias: [],
+      restrictions: [],
+      validFrom: `${eventDate}T00:00:00+09:00`,
+      validTo: null,
+    };
+    state.residents.push(baby);
+    const tx = createTransaction("BIRTH", baby, "BIRTH", eventDate, [{ field: "resident", valueBefore: null, valueAfter: baby.residentId }]);
+    tx.status = "APPLIED";
+    tx.parentResidentId = body.parentResidentId;
+    return { status: 201, body: tx };
+  }
+  if (noticeType === "DEATH") {
+    const resident = state.residents.find((r) => r.residentId === body.residentId);
+    if (!resident) return { status: 404, body: { code: "NOT_FOUND", message: "対象住民が見つかりません。" } };
+    if (resident.movedOutDate) return { status: 409, body: { code: "ALREADY_REMOVED", message: "既に除票済みです。" } };
+    const eventDate = body.eventDate || new Date().toISOString().slice(0, 10);
+    resident.movedOutDate = eventDate;
+    const tx = createTransaction("DEATH", resident, "DEATH", eventDate, [{ field: "movedOutDate", valueBefore: null, valueAfter: eventDate }]);
+    tx.status = "APPLIED";
+    return { status: 201, body: tx };
+  }
+  if (["MARRIAGE", "DIVORCE", "ADOPTION"].includes(noticeType)) {
+    const resident = state.residents.find((r) => r.residentId === body.residentId);
+    if (!resident) return { status: 404, body: { code: "NOT_FOUND", message: "対象住民が見つかりません。" } };
+    if (resident.movedOutDate) return { status: 409, body: { code: "ALREADY_REMOVED", message: "除票済みの住民への戸籍連動は受理できません。" } };
+    const eventDate = body.eventDate || new Date().toISOString().slice(0, 10);
+    const before = resident.familyNameKanji;
+    if (body.newFamilyNameKanji) resident.familyNameKanji = body.newFamilyNameKanji;
+    if (body.newFamilyNameKana) resident.familyNameKana = body.newFamilyNameKana;
+    const reasonCode = `KOSEKI_${noticeType}`;
+    const tx = createTransaction("KOSEKI", resident, reasonCode, eventDate, [
+      { field: "familyNameKanji", valueBefore: before, valueAfter: resident.familyNameKanji },
+    ]);
+    tx.status = "APPLIED";
+    tx.kosekiNoticeId = body.kosekiNoticeId || null;
+    tx.familyNameChanged = Boolean(body.newFamilyNameKanji);
+    return { status: 201, body: tx };
+  }
+  return { status: 400, body: { code: "VALIDATION_ERROR", message: "noticeType は BIRTH / DEATH / MARRIAGE / DIVORCE / ADOPTION のいずれかです。" } };
 }
 
 function minimalCertificatePdf(issue) {
@@ -575,6 +657,40 @@ async function handleApi(req, res, reqUrl) {
     state.jobs.unshift(job);
     audit(user, "ISSUE", "FOREIGNER_EXPIRY_NOTICE", "*", { targetCount: job.targetCount });
     return json(res, 202, job);
+  }
+
+  if (req.method === "POST" && path === "/link/internal/koseki") {
+    if (!canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const applied = applyKosekiLink(body);
+    if (applied.status !== 201) return json(res, applied.status, applied.body);
+    const event = acceptLinkEvent("KOSEKI", body, "APPLIED", applied.body.transactionId);
+    audit(user, "RECEIVE", "LINK_KOSEKI", String(event.eventId), { transactionId: applied.body.transactionId });
+    return json(res, 201, {
+      eventId: String(event.eventId),
+      partnerId: "KOSEKI",
+      status: "APPLIED",
+      transactionId: applied.body.transactionId,
+      transaction: applied.body,
+      receivedAt: event.receivedAt,
+    });
+  }
+
+  const linkMatch = path.match(/^\/link\/(?:cs|number|application)\/inbound$/) || path.match(/^\/link\/internal\/([^/]+)$/);
+  if (req.method === "POST" && linkMatch) {
+    const body = await readBody(req);
+    const partnerId = path.includes("/cs/") ? "CS"
+      : path.includes("/number/") ? "NUMBER"
+      : path.includes("/application/") ? "APPLICATION"
+      : String(linkMatch[1] || "").toUpperCase();
+    const event = acceptLinkEvent(partnerId, body, "ACCEPTED", null);
+    audit(user, "RECEIVE", "LINK", String(event.eventId), { partnerId });
+    return json(res, 202, {
+      eventId: String(event.eventId),
+      partnerId,
+      status: "ACCEPTED",
+      receivedAt: event.receivedAt,
+    });
   }
 
   if (req.method === "POST" && path === "/euc/query") {
