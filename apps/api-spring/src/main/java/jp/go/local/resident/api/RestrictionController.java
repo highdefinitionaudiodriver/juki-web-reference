@@ -49,7 +49,7 @@ public class RestrictionController {
         jdbc.update("update restriction set end_date = current_date where restriction_id = ?", id);
         Integer active = jdbc.queryForObject("""
             select count(*) from restriction
-            where resident_id = ? and (end_date is null or end_date >= current_date)
+            where resident_id = ? and (end_date is null or end_date > current_date)
             """, Integer.class, residentId);
         if (active == null || active == 0) {
             jdbc.update("update resident set restricted_flag = false where resident_id = ?", residentId);
