@@ -64,6 +64,14 @@ const apiMocks = vi.hoisted(() => ({
   })),
   history: vi.fn().mockResolvedValue([]),
   audit: vi.fn().mockResolvedValue([]),
+  moveIn: vi.fn().mockResolvedValue({ transactionId: "TX-IN" }),
+  officialTransaction: vi.fn().mockResolvedValue({
+    transactionId: "TX-OFFICIAL",
+    residentId: "R-001",
+    typeCode: "OFFICIAL",
+    reasonCode: "OFFICIAL_FIX",
+    status: "DRAFT",
+  }),
 }));
 
 vi.mock("./api", () => ({
@@ -87,6 +95,8 @@ describe("App", () => {
     apiMocks.resident.mockClear();
     apiMocks.history.mockClear();
     apiMocks.audit.mockClear();
+    apiMocks.moveIn.mockClear();
+    apiMocks.officialTransaction.mockClear();
   });
 
   it("起動時に me / searchResidents / resident / history を呼び、住民検索ビューを描画する", async () => {
@@ -124,6 +134,27 @@ describe("App", () => {
     await waitFor(() => expect(screen.getByRole("heading", { name: /ロール/ })).toBeInTheDocument());
   });
 
+  it("検索フォームの入力で searchResidents を再実行する", async () => {
+    render(<App />);
+    await waitFor(() => expect(screen.getAllByText("山田 太郎").length).toBeGreaterThan(0));
+    apiMocks.searchResidents.mockClear();
+
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("氏名"), "佐藤");
+    await user.type(screen.getByLabelText("住所"), "中央町");
+    await user.click(screen.getByLabelText("外国人のみ"));
+    await user.click(screen.getByRole("button", { name: /^検索$/ }));
+
+    await waitFor(() =>
+      expect(apiMocks.searchResidents).toHaveBeenCalledWith({
+        name: "佐藤",
+        address: "中央町",
+        foreignerOnly: true,
+        includeRemoved: false,
+      })
+    );
+  });
+
   it("権限/監査ビューの『監査ログ更新』で audit() が呼ばれる", async () => {
     render(<App />);
     const user = userEvent.setup();
@@ -132,6 +163,32 @@ describe("App", () => {
     await waitFor(() => expect(screen.getByRole("button", { name: "監査ログ更新" })).toBeInTheDocument());
     await user.click(screen.getByRole("button", { name: "監査ログ更新" }));
     expect(apiMocks.audit).toHaveBeenCalled();
+  });
+
+  it("転入反映後に notice を表示する", async () => {
+    render(<App />);
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByText("山田 太郎").length).toBeGreaterThan(0));
+    await user.click(screen.getByRole("button", { name: "異動" }));
+    await user.click(screen.getByRole("button", { name: "転入を反映" }));
+
+    await waitFor(() => {
+      expect(apiMocks.moveIn).toHaveBeenCalled();
+      expect(screen.getByText(/転入を反映しました: TX-IN/)).toBeInTheDocument();
+    });
+  });
+
+  it("職権異動の起票後に notice を表示する", async () => {
+    render(<App />);
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByText("山田 太郎").length).toBeGreaterThan(0));
+    await user.click(screen.getByRole("button", { name: "職権異動" }));
+    await user.click(screen.getByRole("button", { name: "起票" }));
+
+    await waitFor(() => {
+      expect(apiMocks.officialTransaction).toHaveBeenCalled();
+      expect(screen.getByText(/職権異動を起票しました: TX-OFFICIAL/)).toBeInTheDocument();
+    });
   });
 
   it("起動時に api.me が失敗するとエラー notice が表示される", async () => {

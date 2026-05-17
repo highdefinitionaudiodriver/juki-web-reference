@@ -147,15 +147,13 @@ jobs:
           echo $! > spring.pid
 
       - name: Wait for Spring API
-        run: npx wait-on -t 90000 http://localhost:8788/v3/api-docs http://localhost:8788/actuator/health
+        run: npx wait-on -t 180000 http://localhost:8788/v3/api-docs http://localhost:8788/actuator/health
 
       - name: Run OpenAPI diff
         run: npm run openapi:diff -- --spring http://localhost:8788/v3/api-docs --spec c_openapi.yaml
-        continue-on-error: true
-        id: diff
 
       - name: Show Spring log on failure
-        if: failure() || steps.diff.outcome == 'failure'
+        if: failure()
         run: cat apps/api-spring/spring.log || true
 
       - name: Stop Spring

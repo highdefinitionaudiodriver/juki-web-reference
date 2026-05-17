@@ -11,7 +11,7 @@
 | --- | ---: | ---: | ---: |
 | API endpoint | 40 | 25+ | **62%+** |
 | DB テーブル | 22 | 22 (DDL) + 主要 8 が runtime 使用中 | **100% / 36%** |
-| 画面 (SCR-ID) | 13 | 7 view（住民検索／住民票／異動／証明発行／**抑止設定**／統計・EUC／権限・監査） | **54%** |
+| 画面 (SCR-ID) | 13 | 8 view（住民検索／住民票／異動／職権異動／証明発行／**抑止設定**／統計・EUC／権限・監査） | **62%** |
 | 機能 (F-ID) | 約38 | 約15 | **39%** |
 | 帳票 (00100xx) | 19 + 年報 | 0010001 / 0010007 (HTML→PDF), 0010002–5 は form_id 出し分け | **30%** |
 | 連携 (IF-ID) | 9 | 0（スケルトン） | **0%** |
@@ -102,17 +102,18 @@
 
 ### C. テスト
 1. Testcontainers IT を全コントローラに広げる
-2. ResidentController の MockMvc 単体テスト（`asOf` / `unmask` / 抑止 404）を拡張
-3. Web 側の App 統合テスト（ナビ切替・notice 表示）を追加
+2. Web 側の App 統合テストを検索フォーム再取得・各操作 notice へ拡張
+3. OpenAPI diff CI の GitHub Actions 実行結果を確認し、必要に応じて待機時間・DB 接続を調整
 
 ## テスト自動化状況
 
 | 種別 | 現状 |
 | --- | --- |
 | Spring | 61 件（MockMvc 52 PASS + Testcontainers IT 9 SKIP: Docker なし環境） |
-| Vitest | 17 件 PASS（Search / Restriction / Certificate / Official / Move / Reports） |
+| Vitest | 24 件 PASS（App / Search / Restriction / Certificate / Official / Move / Reports） |
 | Playwright API | 13 件 PASS |
 | Playwright a11y | 7 画面（住民検索／住民票／証明発行／抑止設定／異動／統計EUC／権限監査） |
+| CI | OpenAPI diff ジョブで `c_openapi.yaml` と Spring runtime `/v3/api-docs` を比較 |
 
 ## 結論
 

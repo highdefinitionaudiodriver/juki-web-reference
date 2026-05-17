@@ -60,8 +60,9 @@
 | 認証 | OIDC リソースサーバ + Keycloak dev IdP + Web PKCE、WebAuthn は足場 |
 | 抑止／項目別マスク | 設計仕様準拠で実装（WINDOW から DV 対象は 404、個人番号は要権限） |
 | 連携 (9 系統) | 戸籍連動は異動反映、CS/番号/税/国保/選挙は業務別ペイロード対応 |
-| E2E | Playwright API 13 件 PASS、a11y 7 画面スイートあり |
+| E2E / CI | Playwright API 13 件 PASS、a11y 7 画面、OpenAPI diff CI ジョブあり |
 | Spring テスト | MockMvc + Testcontainers IT 61 件（Docker なし環境では IT 9 件 skip） |
+| Web テスト | Vitest + React Testing Library 24 件 PASS |
 
 詳細は [`docs/gap_matrix.md`](docs/gap_matrix.md) を参照。
 
@@ -90,6 +91,7 @@ npm run web:test     # Vitest + React Testing Library
 npm run smoke        # Node API ロジックのスモーク
 npm run e2e:api      # Playwright API E2E (Node 版に対して)
 npm run e2e:a11y     # axe-core による a11y E2E（Chromium install 後）
+npm run openapi:diff -- --spring http://localhost:8788/v3/api-docs
 npm run web:build    # Vite production build
 ```
 
@@ -115,6 +117,9 @@ mvn -B spring-boot:run         # :8788
 cd ../..
 npm run openapi:diff -- --spring http://localhost:8788/v3/api-docs
 ```
+
+CI の `openapi-diff` ジョブでは Spring を `ci` プロファイルで起動します。このプロファイルは
+`/v3/api-docs` 取得専用で認可を無効化するため、本番・結合試験では使わないでください。
 
 ## ディレクトリ構成
 
