@@ -102,7 +102,7 @@
 
 ### C. テスト
 1. Testcontainers IT を全コントローラに広げる
-2. Web 側の View レベル単体テスト（Vitest + Testing Library）
+2. Web 側の View レベル単体テスト（Vitest + Testing Library）を残り画面へ拡張
 
 ## 結論
 

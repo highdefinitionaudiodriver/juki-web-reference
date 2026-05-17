@@ -53,15 +53,15 @@
 
 | 観点 | 状況 |
 |---|---|
-| API endpoint (40 設計) | Node: 17 実装 / Spring: 主要 controller スケルトン+業務ルール |
-| 画面 (13 設計) | 6 view に集約実装（住民検索／住民票／異動／証明発行／統計・EUC／権限・監査） |
+| API endpoint (40 設計) | Node / Spring とも主要業務 API を実装、戸籍・コード・在留・連携を拡張中 |
+| 画面 (13 設計) | 8 view に集約実装（住民検索／住民票／異動／職権異動／証明発行／抑止／統計・EUC／権限・監査） |
 | DB テーブル (22 設計) | DDL は Flyway で全 22 適用、JDBC で主要 8 テーブル運用中 |
 | 帳票 (19+ 設計) | 0010001 / 0010007 を OpenHTMLtoPDF で生成、その他は ID 単位で出し分け対応 |
-| 認証 | OIDC リソースサーバ構成済（HS256 dev / RS256 本番想定）、WebAuthn は足場のみ |
+| 認証 | OIDC リソースサーバ + Keycloak dev IdP + Web PKCE、WebAuthn は足場 |
 | 抑止／項目別マスク | 設計仕様準拠で実装（WINDOW から DV 対象は 404、個人番号は要権限） |
-| 連携 (9 系統) | スケルトンのみ |
-| E2E | Playwright 7 件 PASS（Node API 4 + Spring smoke 3） |
-| Spring 単体テスト | 3 PASS + 2 SKIP（Testcontainers は Docker 環境で実行） |
+| 連携 (9 系統) | 戸籍連動は異動反映、CS/番号/税/国保/選挙は業務別ペイロード対応 |
+| E2E | Playwright API 13 件 PASS、a11y スイートあり |
+| Spring テスト | MockMvc + Testcontainers IT（Docker なし環境では IT skip） |
 
 詳細は [`docs/gap_matrix.md`](docs/gap_matrix.md) を参照。
 
@@ -86,8 +86,10 @@ npm run dev
 
 ```powershell
 npm run check        # TypeScript 型検査
+npm run web:test     # Vitest + React Testing Library
 npm run smoke        # Node API ロジックのスモーク
 npm run e2e:api      # Playwright API E2E (Node 版に対して)
+npm run e2e:a11y     # axe-core による a11y E2E（Chromium install 後）
 npm run web:build    # Vite production build
 ```
 
