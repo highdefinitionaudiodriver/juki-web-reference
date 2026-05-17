@@ -118,6 +118,34 @@ describe("App", () => {
     apiMocks.audit.mockClear();
     apiMocks.moveIn.mockClear();
     apiMocks.officialTransaction.mockClear();
+    apiMocks.issueCertificate.mockClear();
+    apiMocks.createRestriction.mockClear();
+    apiMocks.deleteRestriction.mockClear();
+    apiMocks.annualReport.mockClear();
+    apiMocks.eucQuery.mockClear();
+    // resident のモックを既定値（restrictions: []）に戻す
+    apiMocks.resident.mockImplementation(async (id: string) => ({
+      residentId: id,
+      householdId: "H-001",
+      familyNameKanji: "山田",
+      givenNameKanji: "太郎",
+      familyNameKana: "ヤマダ",
+      givenNameKana: "タロウ",
+      birthDate: "1985-04-01",
+      sex: "M",
+      addressCode: "132010001001",
+      addressText: "東京都サンプル市1-1",
+      relationToHead: "本人",
+      movedInDate: "2018-06-01",
+      movedOutDate: null,
+      juminCode: "**** **** ***",
+      myNumber: "**** **** ****",
+      nationality: null,
+      alias: [],
+      restrictions: [],
+      validFrom: "2018-06-01T00:00:00+09:00",
+      validTo: null,
+    }));
   });
 
   it("起動時に me / searchResidents / resident / history を呼び、住民検索ビューを描画する", async () => {
@@ -217,6 +245,89 @@ describe("App", () => {
     render(<App />);
     await waitFor(() => {
       expect(screen.getByText(/network down/)).toBeInTheDocument();
+    });
+  });
+
+  it("抑止登録が失敗するとエラー notice が表示される", async () => {
+    apiMocks.createRestriction.mockRejectedValueOnce(new Error("forbidden"));
+    render(<App />);
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByText("山田 太郎").length).toBeGreaterThan(0));
+    await user.click(screen.getByRole("button", { name: "抑止設定" }));
+    await user.click(screen.getByRole("button", { name: "抑止を登録" }));
+    await waitFor(() => {
+      expect(apiMocks.createRestriction).toHaveBeenCalled();
+      expect(screen.getByText(/抑止登録に失敗しました/)).toBeInTheDocument();
+    });
+  });
+
+  it("既存抑止がある住民で解除ボタン押下で deleteRestriction が呼ばれ notice 表示", async () => {
+    const residentWithRestriction = {
+      residentId: "R-001",
+      householdId: "H-001",
+      familyNameKanji: "山田",
+      givenNameKanji: "太郎",
+      familyNameKana: "ヤマダ",
+      givenNameKana: "タロウ",
+      birthDate: "1985-04-01",
+      sex: "M",
+      addressCode: "132010001001",
+      addressText: "東京都サンプル市1-1",
+      relationToHead: "本人",
+      movedInDate: "2018-06-01",
+      movedOutDate: null,
+      juminCode: "**** **** ***",
+      myNumber: "**** **** ****",
+      nationality: null,
+      alias: [],
+      restrictions: [
+        {
+          id: "RST-99",
+          residentId: "R-001",
+          category: "DV",
+          startDate: "2025-04-01",
+          scope: "SELF",
+          releaseRole: "RESTRICTION_RELEASE",
+          note: "",
+        },
+      ],
+      validFrom: "2018-06-01T00:00:00+09:00",
+      validTo: null,
+    };
+    apiMocks.resident.mockResolvedValue(residentWithRestriction);
+
+    render(<App />);
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByText("山田 太郎").length).toBeGreaterThan(0));
+    await user.click(screen.getByRole("button", { name: "抑止設定" }));
+    // 抑止解除ボタンが見えるまで待つ
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: "解除" })).toBeInTheDocument()
+    );
+    await user.click(screen.getByRole("button", { name: "解除" }));
+    await waitFor(() => {
+      expect(apiMocks.deleteRestriction).toHaveBeenCalledWith("RST-99");
+      expect(screen.getByText(/抑止を解除しました: RST-99/)).toBeInTheDocument();
+    });
+  });
+
+  it("EUC 個人番号含む依頼は二段階承認 notice を表示する", async () => {
+    apiMocks.eucQuery.mockResolvedValueOnce({
+      jobId: "JOB-EUC-PENDING",
+      status: "QUEUED",
+      progress: 10,
+      resultUrl: null,
+      requiresSecondApproval: true,
+    });
+    render(<App />);
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByText("山田 太郎").length).toBeGreaterThan(0));
+    await user.click(screen.getByRole("button", { name: "統計/EUC" }));
+    // 個人番号を含むチェックボックスを ON
+    await user.click(screen.getByLabelText(/個人番号を含む/));
+    await user.click(screen.getByRole("button", { name: "抽出依頼" }));
+    await waitFor(() => {
+      expect(screen.getByText(/EUC依頼を保留しました。二段階承認が必要です: JOB-EUC-PENDING/)).toBeInTheDocument();
     });
   });
 
