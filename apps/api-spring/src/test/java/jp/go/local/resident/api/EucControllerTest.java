@@ -5,12 +5,20 @@ import static org.springframework.security.test.web.servlet.request.SecurityMock
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
+import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.Mockito.lenient;
+import static org.mockito.Mockito.mock;
 
 import java.util.List;
+import java.util.Map;
+import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
 import org.springframework.boot.test.autoconfigure.web.servlet.WebMvcTest;
+import org.springframework.boot.test.context.TestConfiguration;
+import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
+import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -22,9 +30,18 @@ import org.springframework.test.web.servlet.MockMvc;
  *  - それ以外は DONE 状態
  */
 @WebMvcTest(controllers = EucController.class)
+@org.springframework.context.annotation.Import(EucControllerTest.MockBeans.class)
 class EucControllerTest {
 
     @Autowired MockMvc mvc;
+    @Autowired JdbcTemplate jdbc;
+
+    @BeforeEach
+    void resetMocks() {
+        org.mockito.Mockito.reset(jdbc);
+        lenient().when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("insert into report_request"),
+                any(Object[].class))).thenReturn(Map.of("request_id", 42L));
+    }
 
     @Test
     void query_withoutMyNumber_returnsDoneStatus() throws Exception {
@@ -36,7 +53,7 @@ class EucControllerTest {
                     {"outputFields":["residentId","name","addressText"]}
                     """))
             .andExpect(status().isAccepted())
-            .andExpect(jsonPath("$.jobId").exists())
+            .andExpect(jsonPath("$.jobId").value("EUC-42"))
             .andExpect(jsonPath("$.status").value("DONE"))
             .andExpect(jsonPath("$.progress").value(100))
             .andExpect(jsonPath("$.resultUrl").value("/euc/result.csv"))
@@ -71,5 +88,10 @@ class EucControllerTest {
             .andExpect(status().isAccepted())
             .andExpect(jsonPath("$.status").value("QUEUED"))
             .andExpect(jsonPath("$.requiresSecondApproval").value(true));
+    }
+
+    @TestConfiguration
+    static class MockBeans {
+        @Bean JdbcTemplate jdbcTemplate() { return mock(JdbcTemplate.class); }
     }
 }
