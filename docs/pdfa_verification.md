@@ -67,6 +67,19 @@ docker run --rm `
 - validation result: compliant
 - フォント未埋め込みエラーが出ない
 
+## 6. CI ジョブ
+
+GitHub Actions の `PDF/A veraPDF` ジョブでも同じ検証を行います。
+
+- `apps/api-spring/Dockerfile` から `resident-record-api:pdfa` を build
+- `SPRING_PROFILES_ACTIVE=ci` で Spring API を起動
+- PostgreSQL に PDF/A 検証用の `user_account` / `household` / `resident` / `household_member` を投入
+- `/api/v1/certificates/jumin` で証明発行
+- `/api/v1/certificates/{issueId}/pdf` を取得
+- `ghcr.io/verapdf/verapdf:latest` で `isCompliant=true` を確認
+
+失敗時は `pdfa-verification` artifact に `issue.json` / PDF / `verapdf.xml` を保存します。
+
 ## 注意
 
 - `CERT_PDF_A=true` でも `CERT_FONT_SERIF_JP` のファイルが存在しない場合、アプリは PDF/A 指定を自動的に無効化します。

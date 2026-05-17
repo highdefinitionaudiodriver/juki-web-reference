@@ -72,10 +72,14 @@ public class CertificatePdfService {
         Map<String, Object> resident;
         try {
             resident = jdbc.queryForMap("""
-                select family_name_kanji, given_name_kanji, family_name_kana, given_name_kana,
-                       birth_date, sex, address_text, relation_to_head, moved_in_date, household_id
-                  from resident
-                 where resident_id = ?
+                select r.family_name_kanji, r.given_name_kanji, r.family_name_kana, r.given_name_kana,
+                       r.birth_date, r.sex, r.address_text, hm.relation_to_head, r.moved_in_date, r.household_id
+                  from resident r
+             left join household_member hm
+                    on hm.resident_id = r.resident_id
+                   and hm.household_id = r.household_id
+                   and hm.left_date is null
+                 where r.resident_id = ?
                 """, residentId);
         } catch (EmptyResultDataAccessException e) {
             resident = Map.of();

@@ -171,3 +171,115 @@ jobs:
           path: apps/api-spring/spring.log
           if-no-files-found: ignore
           retention-days: 7
+
+  pdfa-verify:
+    name: PDF/A veraPDF
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: resident
+          POSTGRES_USER: resident
+          POSTGRES_PASSWORD: resident
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resident -d resident"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Build Spring PDF/A image
+        run: docker build -t resident-record-api:pdfa apps/api-spring
+
+      - name: Start Spring API
+        run: |
+          docker run -d \
+            --name resident-record-api-pdfa \
+            --network host \
+            -e SPRING_PROFILES_ACTIVE=ci \
+            -e DB_URL=jdbc:postgresql://localhost:5432/resident \
+            -e DB_USER=resident \
+            -e DB_PASSWORD=resident \
+            -e CERT_PDF_A=true \
+            resident-record-api:pdfa
+
+      - name: Wait for Spring API
+        run: |
+          for i in {1..60}; do
+            if curl -fsS http://localhost:8788/actuator/health >/dev/null; then
+              exit 0
+            fi
+            sleep 3
+          done
+          docker logs resident-record-api-pdfa || true
+          exit 1
+
+      - name: Seed certificate fixture
+        run: |
+          docker run --rm --network host -e PGPASSWORD=resident postgres:16 \
+            psql -h localhost -U resident -d resident -v ON_ERROR_STOP=1 <<'SQL'
+          insert into user_account (user_id, employee_no, department, full_name)
+          values ('system', 'SYS', 'CI', 'CI System')
+          on conflict (user_id) do nothing;
+
+          insert into household (household_id, address_text, established_date)
+          values ('H-PDFA', '東京都サンプル市PDF1-1', '2020-01-01')
+          on conflict (household_id) do nothing;
+
+          insert into resident
+            (resident_id, household_id, family_name_kanji, given_name_kanji, family_name_kana, given_name_kana,
+             birth_date, sex, address_text, moved_in_date, restricted_flag, valid_from)
+          values ('R-PDFA', 'H-PDFA', '検証', '太郎', 'ケンショウ', 'タロウ',
+                  '1985-04-01', 'M', '東京都サンプル市PDF1-1', '2020-01-01', false, now())
+          on conflict (resident_id) do nothing;
+
+          insert into household_member (household_id, resident_id, relation_to_head, joined_date)
+          values ('H-PDFA', 'R-PDFA', '本人', '2020-01-01')
+          on conflict do nothing;
+
+          update household set head_resident_id = 'R-PDFA' where household_id = 'H-PDFA';
+          SQL
+
+      - name: Issue certificate and download PDF
+        run: |
+          mkdir -p artifacts/pdfa
+          curl -fsS \
+            -H "Content-Type: application/json" \
+            -d '{"residentId":"R-PDFA","formId":"0010001","copies":1,"usageText":"PDF/A CI"}' \
+            http://localhost:8788/api/v1/certificates/jumin > artifacts/pdfa/issue.json
+          ISSUE_ID="$(python3 -c "import json; print(json.load(open('artifacts/pdfa/issue.json'))['issueId'])")"
+          curl -fsS \
+            "http://localhost:8788/api/v1/certificates/${ISSUE_ID}/pdf" \
+            -o "artifacts/pdfa/certificate-${ISSUE_ID}.pdf"
+          echo "PDF_PATH=artifacts/pdfa/certificate-${ISSUE_ID}.pdf" >> "$GITHUB_ENV"
+
+      - name: Run veraPDF
+        run: |
+          docker run --rm \
+            -v "${{ github.workspace }}/artifacts/pdfa:/work" \
+            ghcr.io/verapdf/verapdf:latest \
+            --format xml "/work/$(basename "$PDF_PATH")" | tee artifacts/pdfa/verapdf.xml
+          grep -q "<isCompliant>true</isCompliant>" artifacts/pdfa/verapdf.xml
+
+      - name: Show Spring log on failure
+        if: failure()
+        run: docker logs resident-record-api-pdfa || true
+
+      - name: Stop Spring API
+        if: always()
+        run: docker rm -f resident-record-api-pdfa || true
+
+      - name: Upload PDF/A artifacts
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: pdfa-verification
+          path: artifacts/pdfa/
+          if-no-files-found: ignore
+          retention-days: 7
