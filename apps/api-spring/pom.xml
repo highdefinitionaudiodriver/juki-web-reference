@@ -62,6 +62,12 @@
       <artifactId>springdoc-openapi-starter-webmvc-ui</artifactId>
       <version>2.7.0</version>
     </dependency>
+    <!-- パスワード付 ZIP 暗号化（EUC 結果配信用） -->
+    <dependency>
+      <groupId>net.lingala.zip4j</groupId>
+      <artifactId>zip4j</artifactId>
+      <version>2.11.5</version>
+    </dependency>
     <!-- 帳票 HTML → PDF/A レンダリング -->
     <dependency>
       <groupId>com.openhtmltopdf</groupId>

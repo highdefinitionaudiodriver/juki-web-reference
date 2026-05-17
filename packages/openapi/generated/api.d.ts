@@ -1323,8 +1323,13 @@ export interface paths {
             cookie?: never;
         };
         /**
-         * EUC 抽出結果 ZIP 取得
-         * @description 二段階承認不要の DONE ジョブのみ CSV を ZIP で返す。個人番号を含む QUEUED ジョブは 409。パスワード付 ZIP 暗号化は後続。
+         * EUC 抽出結果 ZIP 取得（AES-256 パスワード付）
+         * @description 二段階承認不要の DONE ジョブのみ CSV を AES-256 パスワード付 ZIP で返す。
+         *     個人番号を含む QUEUED ジョブは 409。
+         *     ダウンロード毎にランダムパスワードを生成し、`X-Euc-Password` ヘッダに平文で
+         *     返却する（漏洩リスクのため TLS 必須）。SHA-256 ハッシュは
+         *     `X-Euc-Password-Hash` および `report_request.result_url` の
+         *     `?passwordHash=...` に記録される（監査用）。
          */
         get: {
             parameters: {
@@ -1337,9 +1342,13 @@ export interface paths {
             };
             requestBody?: never;
             responses: {
-                /** @description ZIP */
+                /** @description AES-256 暗号化 ZIP */
                 200: {
                     headers: {
+                        /** @description ZIP の復号パスワード（平文）。漏洩防止のため別経路通知への置換を推奨。 */
+                        "X-Euc-Password"?: string;
+                        /** @description パスワードの SHA-256 ハッシュ（hex 64 文字）。監査用。 */
+                        "X-Euc-Password-Hash"?: string;
                         [name: string]: unknown;
                     };
                     content: {

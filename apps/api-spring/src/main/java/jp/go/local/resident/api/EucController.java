@@ -3,17 +3,25 @@ package jp.go.local.resident.api;
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
 import java.io.IOException;
 import java.io.UncheckedIOException;
 import java.nio.charset.StandardCharsets;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.time.OffsetDateTime;
 import java.util.ArrayList;
+import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.ZipEntry;
-import java.util.zip.ZipOutputStream;
+import net.lingala.zip4j.io.outputstream.ZipOutputStream;
+import net.lingala.zip4j.model.ZipParameters;
+import net.lingala.zip4j.model.enums.AesKeyStrength;
+import net.lingala.zip4j.model.enums.CompressionMethod;
+import net.lingala.zip4j.model.enums.EncryptionMethod;
 import org.springframework.http.ContentDisposition;
 import org.springframework.http.HttpHeaders;
 import org.springframework.http.HttpStatus;
@@ -38,6 +46,11 @@ public class EucController {
         "sex", "sex",
         "householdId", "household_id"
     );
+    private static final SecureRandom RANDOM = new SecureRandom();
+    /** ZIP パスワード生成に使う文字集合（紛らわしい I/l/0/O は除外）。 */
+    private static final char[] PASSWORD_ALPHABET =
+        "ABCDEFGHJKLMNPQRSTUVWXYZabcdefghjkmnpqrstuvwxyz23456789".toCharArray();
+    private static final int PASSWORD_LENGTH = 16;
 
     private final JdbcTemplate jdbc;
     private final ObjectMapper objectMapper;
@@ -76,6 +89,16 @@ public class EucController {
         return ResponseEntity.status(202).body(response);
     }
 
+    /**
+     * EUC 結果 ZIP のダウンロード。
+     *
+     * - 応答ヘッダ `X-Euc-Password`: 当該リクエストで生成された平文パスワード
+     * - 応答ヘッダ `X-Euc-Password-Hash`: SHA-256 ハッシュ（hex 64 文字、監査用）
+     * - パスワードハッシュは `report_request.result_url` の末尾に
+     *   `?passwordHash=...` として記録される（平文は保存しない）
+     *
+     * ZIP は AES-256 で暗号化。CSV エントリ名は `{jobId}-result.csv`。
+     */
     @GetMapping("/{jobId}/result.zip")
     public ResponseEntity<byte[]> download(@PathVariable String jobId) {
         long requestId = requestId(jobId);
@@ -101,11 +124,22 @@ public class EucController {
         if (fields.isEmpty()) {
             fields = DEFAULT_FIELDS;
         }
-        byte[] zip = zipCsv(jobId, fields);
+
+        String password = generatePassword();
+        byte[] zip = zipCsvEncrypted(jobId, fields, password);
+        String passwordHash = sha256Hex(password);
+
+        // 監査用にパスワードハッシュを result_url に追記（平文は保存しない）
+        String baseUrl = "/api/v1/euc/" + jobId + "/result.zip";
+        jdbc.update("update report_request set result_url = ? where request_id = ?",
+            baseUrl + "?passwordHash=" + passwordHash, requestId);
+
         return ResponseEntity.ok()
             .contentType(MediaType.parseMediaType("application/zip"))
             .header(HttpHeaders.CONTENT_DISPOSITION,
                 ContentDisposition.attachment().filename(jobId + "-result.zip").build().toString())
+            .header("X-Euc-Password", password)
+            .header("X-Euc-Password-Hash", passwordHash)
             .body(zip);
     }
 
@@ -151,7 +185,8 @@ public class EucController {
         }
     }
 
-    private byte[] zipCsv(String jobId, List<String> fields) {
+    /** AES-256 パスワード付 ZIP を生成する。 */
+    private byte[] zipCsvEncrypted(String jobId, List<String> fields, String password) {
         String select = fields.stream()
             .map(field -> FIELD_EXPRESSIONS.get(field) + " as \"" + field + "\"")
             .reduce((left, right) -> left + ", " + right)
@@ -165,16 +200,47 @@ public class EucController {
              limit 1000
             """.formatted(select));
 
-        ByteArrayOutputStream bytes = new ByteArrayOutputStream();
-        try (ZipOutputStream zip = new ZipOutputStream(bytes, StandardCharsets.UTF_8)) {
-            zip.setComment("password-protected-delivery-required");
-            zip.putNextEntry(new ZipEntry(jobId + "-result.csv"));
-            zip.write(csv(fields, rows).getBytes(StandardCharsets.UTF_8));
+        byte[] csvBytes = csv(fields, rows).getBytes(StandardCharsets.UTF_8);
+
+        ZipParameters zp = new ZipParameters();
+        zp.setCompressionMethod(CompressionMethod.DEFLATE);
+        zp.setEncryptFiles(true);
+        zp.setEncryptionMethod(EncryptionMethod.AES);
+        zp.setAesKeyStrength(AesKeyStrength.KEY_STRENGTH_256);
+        zp.setFileNameInZip(jobId + "-result.csv");
+
+        ByteArrayOutputStream out = new ByteArrayOutputStream();
+        try (ZipOutputStream zip = new ZipOutputStream(out, password.toCharArray());
+             ByteArrayInputStream in = new ByteArrayInputStream(csvBytes)) {
+            zip.putNextEntry(zp);
+            byte[] buf = new byte[4096];
+            int read;
+            while ((read = in.read(buf)) != -1) {
+                zip.write(buf, 0, read);
+            }
             zip.closeEntry();
         } catch (IOException e) {
-            throw new UncheckedIOException("EUC ZIP generation failed", e);
+            throw new UncheckedIOException("EUC ZIP encryption failed", e);
         }
-        return bytes.toByteArray();
+        return out.toByteArray();
+    }
+
+    private static String generatePassword() {
+        StringBuilder sb = new StringBuilder(PASSWORD_LENGTH);
+        for (int i = 0; i < PASSWORD_LENGTH; i++) {
+            sb.append(PASSWORD_ALPHABET[RANDOM.nextInt(PASSWORD_ALPHABET.length)]);
+        }
+        return sb.toString();
+    }
+
+    private static String sha256Hex(String value) {
+        try {
+            MessageDigest digest = MessageDigest.getInstance("SHA-256");
+            byte[] hash = digest.digest(value.getBytes(StandardCharsets.UTF_8));
+            return HexFormat.of().formatHex(hash);
+        } catch (NoSuchAlgorithmException e) {
+            throw new IllegalStateException("SHA-256 unavailable", e);
+        }
     }
 
     private String csv(List<String> fields, List<Map<String, Object>> rows) {

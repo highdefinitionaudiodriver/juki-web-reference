@@ -13,10 +13,11 @@ import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.when;
 
+import java.io.ByteArrayInputStream;
 import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
-import java.util.zip.ZipInputStream;
+import net.lingala.zip4j.io.inputstream.ZipInputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -97,7 +98,7 @@ class EucControllerTest {
     }
 
     @Test
-    void download_doneJob_returnsZipWithCsv() throws Exception {
+    void download_doneJob_returnsEncryptedZipAndPasswordHeader() throws Exception {
         when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(42L)))
             .thenReturn(Map.of(
                 "status", "DONE",
@@ -107,17 +108,57 @@ class EucControllerTest {
             Map.of("residentId", "R001", "name", "住民 太郎", "addressText", "東京都サンプル市1-1")
         ));
 
+        var response = mvc.perform(get("/api/v1/euc/EUC-42/result.zip")
+                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN")))))
+            .andExpect(status().isOk())
+            .andReturn().getResponse();
+
+        // パスワードヘッダ
+        String password = response.getHeader("X-Euc-Password");
+        String passwordHash = response.getHeader("X-Euc-Password-Hash");
+        org.assertj.core.api.Assertions.assertThat(password).isNotBlank().hasSize(16);
+        org.assertj.core.api.Assertions.assertThat(passwordHash).matches("[0-9a-f]{64}");
+
+        // AES-256 暗号化ZIP を password で復号して中身検証
+        byte[] body = response.getContentAsByteArray();
+        try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(body), password.toCharArray())) {
+            var entry = zip.getNextEntry();
+            org.assertj.core.api.Assertions.assertThat(entry.getFileName()).isEqualTo("EUC-42-result.csv");
+            String csv = new String(zip.readAllBytes(), StandardCharsets.UTF_8);
+            org.assertj.core.api.Assertions.assertThat(csv).contains("residentId,name,addressText");
+            org.assertj.core.api.Assertions.assertThat(csv).contains("\"R001\",\"住民 太郎\",\"東京都サンプル市1-1\"");
+        }
+
+        // 監査用 result_url 更新が呼ばれている
+        org.mockito.Mockito.verify(jdbc).update(
+            org.mockito.ArgumentMatchers.contains("update report_request set result_url = ?"),
+            org.mockito.ArgumentMatchers.contains("passwordHash="),
+            eq(42L));
+    }
+
+    @Test
+    void download_wrongPassword_failsToOpen() throws Exception {
+        when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(42L)))
+            .thenReturn(Map.of(
+                "status", "DONE",
+                "params", "{\"outputFields\":[\"residentId\"]}"
+            ));
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("from resident"))).thenReturn(List.of(
+            Map.of("residentId", "R001")
+        ));
+
         byte[] body = mvc.perform(get("/api/v1/euc/EUC-42/result.zip")
                 .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN")))))
             .andExpect(status().isOk())
             .andReturn().getResponse().getContentAsByteArray();
 
-        try (ZipInputStream zip = new ZipInputStream(new java.io.ByteArrayInputStream(body), StandardCharsets.UTF_8)) {
-            org.assertj.core.api.Assertions.assertThat(zip.getNextEntry().getName()).isEqualTo("EUC-42-result.csv");
-            String csv = new String(zip.readAllBytes(), StandardCharsets.UTF_8);
-            org.assertj.core.api.Assertions.assertThat(csv).contains("residentId,name,addressText");
-            org.assertj.core.api.Assertions.assertThat(csv).contains("\"R001\",\"住民 太郎\",\"東京都サンプル市1-1\"");
-        }
+        // 間違ったパスワードで開くと例外（または不正データ）
+        org.assertj.core.api.Assertions.assertThatThrownBy(() -> {
+            try (ZipInputStream zip = new ZipInputStream(new ByteArrayInputStream(body), "wrongpass".toCharArray())) {
+                zip.getNextEntry();
+                zip.readAllBytes();
+            }
+        }).isInstanceOf(Exception.class);
     }
 
     @Test

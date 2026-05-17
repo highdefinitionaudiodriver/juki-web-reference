@@ -10,7 +10,7 @@ import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.nio.charset.StandardCharsets;
 import java.time.OffsetDateTime;
-import java.util.zip.ZipInputStream;
+import net.lingala.zip4j.io.inputstream.ZipInputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -128,9 +128,18 @@ class EucIT {
 
         assertThat(zipRes.getResponse().getStatus()).isEqualTo(200);
         assertThat(zipRes.getResponse().getContentType()).isEqualTo("application/zip");
+
+        // パスワードヘッダを取得し、AES-256 暗号化 ZIP を復号する
+        String password = zipRes.getResponse().getHeader("X-Euc-Password");
+        String passwordHash = zipRes.getResponse().getHeader("X-Euc-Password-Hash");
+        assertThat(password).isNotBlank().hasSize(16);
+        assertThat(passwordHash).matches("[0-9a-f]{64}");
+
         try (ZipInputStream zip = new ZipInputStream(
-                new java.io.ByteArrayInputStream(zipRes.getResponse().getContentAsByteArray()), StandardCharsets.UTF_8)) {
-            assertThat(zip.getNextEntry().getName()).endsWith("-result.csv");
+                new java.io.ByteArrayInputStream(zipRes.getResponse().getContentAsByteArray()),
+                password.toCharArray())) {
+            var entry = zip.getNextEntry();
+            assertThat(entry.getFileName()).endsWith("-result.csv");
             String csv = new String(zip.readAllBytes(), StandardCharsets.UTF_8);
             assertThat(csv).contains("residentId,name,addressText");
             assertThat(csv).contains(residentId);
