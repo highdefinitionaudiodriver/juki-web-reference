@@ -22,14 +22,15 @@ Keycloak は `--import-realm` で `apps/api-spring/keycloak-realm/juki-realm.jso
 | Redirect URIs | `http://localhost:{5173,8787,8788}/*` |
 | Realm Roles | `WINDOW`, `REVIEW`, `RESTRICTION_RELEASE`, `ADMIN` |
 | Token Claim | `roles`（Realm Role を access/id token に String[] として埋め込み） |
+| Token Claim | `department`（ユーザ属性を access/id token に文字列として埋め込み） |
 
 ### テストユーザ
 
-| ユーザ | パスワード | ロール |
-|---|---|---|
-| `window` | `password` | WINDOW |
-| `review` | `password` | WINDOW, REVIEW |
-| `admin-user` | `password` | WINDOW, REVIEW, RESTRICTION_RELEASE, ADMIN |
+| ユーザ | パスワード | 所属 | ロール |
+|---|---|---|---|
+| `window` | `password` | 住民課 窓口係 | WINDOW |
+| `review` | `password` | 住民課 審査係 | WINDOW, REVIEW |
+| `admin-user` | `password` | 情報政策課 | WINDOW, REVIEW, RESTRICTION_RELEASE, ADMIN |
 
 ## 3. Spring 側の差し替え
 
@@ -53,7 +54,9 @@ mvn -B spring-boot:run
 
 Spring 起動時に `/realms/juki/.well-known/openid-configuration` を取得し、JWKS 経由で
 ID Token を検証します。`JwtAuthenticationConverter` が `roles` claim を `ROLE_*` に展開する
-ので、`@PreAuthorize("hasRole('ADMIN')")` 等がそのまま効きます。
+ので、`@PreAuthorize("hasRole('ADMIN')")` 等がそのまま効きます。`/api/v1/me` は
+`sub` / `name` / `department` / `roles` を返すため、Keycloak realm には `roles` mapper と
+`department` mapper の両方を入れています。
 
 ## 4. Web 側からのログイン（Authorization Code + PKCE）
 

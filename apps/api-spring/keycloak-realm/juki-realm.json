@@ -22,6 +22,9 @@
       "firstName": "窓口",
       "lastName": "太郎",
       "email": "window@example.go.jp",
+      "attributes": {
+        "department": [ "住民課 窓口係" ]
+      },
       "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
       "realmRoles": [ "WINDOW" ]
     },
@@ -31,6 +34,9 @@
       "firstName": "審査",
       "lastName": "花子",
       "email": "review@example.go.jp",
+      "attributes": {
+        "department": [ "住民課 審査係" ]
+      },
       "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
       "realmRoles": [ "WINDOW", "REVIEW" ]
     },
@@ -40,6 +46,9 @@
       "firstName": "管理",
       "lastName": "次郎",
       "email": "admin-user@example.go.jp",
+      "attributes": {
+        "department": [ "情報政策課" ]
+      },
       "credentials": [ { "type": "password", "value": "password", "temporary": false } ],
       "realmRoles": [ "ADMIN", "RESTRICTION_RELEASE", "REVIEW", "WINDOW" ]
     }
@@ -75,6 +84,20 @@
             "claim.name": "roles",
             "jsonType.label": "String",
             "multivalued": "true",
+            "userinfo.token.claim": "true",
+            "id.token.claim": "true",
+            "access.token.claim": "true"
+          }
+        },
+        {
+          "name": "department-to-claim",
+          "protocol": "openid-connect",
+          "protocolMapper": "oidc-usermodel-attribute-mapper",
+          "consentRequired": false,
+          "config": {
+            "user.attribute": "department",
+            "claim.name": "department",
+            "jsonType.label": "String",
             "userinfo.token.claim": "true",
             "id.token.claim": "true",
             "access.token.claim": "true"
