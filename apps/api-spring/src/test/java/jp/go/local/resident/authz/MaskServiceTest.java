@@ -48,6 +48,37 @@ class MaskServiceTest {
         assertThat(admin.get("juminCode")).isEqualTo("12345678901");
     }
 
+    @Test
+    void reviewRoleCanUnmaskSensitiveCodesWhenRequested() {
+        Resident resident = resident(false);
+        when(juminCodeRepository.findCurrentByResidentId("R001"))
+            .thenReturn(Optional.of(new JuminCode(1L, "R001", "12345678901", LocalDate.now(), null, "ISSUE")));
+        when(myNumberRepository.findCurrentByResidentId("R001"))
+            .thenReturn(Optional.of(new MyNumber(1L, "R001", "enc:abcd", LocalDate.now(), null, "ISSUE")));
+
+        Map<String, Object> response = maskService.toResponse(resident, auth("REVIEW"), List.of("my_number", "jumin_code"));
+
+        assertThat(response.get("myNumber")).isEqualTo("enc:abcd");
+        assertThat(response.get("juminCode")).isEqualTo("12345678901");
+    }
+
+    @Test
+    void adminStillSeesMaskedCodesWhenUnmaskWasNotRequested() {
+        Resident resident = resident(false);
+
+        Map<String, Object> response = maskService.toResponse(resident, auth("ADMIN"), List.of());
+
+        assertThat(response.get("myNumber")).isEqualTo("**** **** ****");
+        assertThat(response.get("juminCode")).isEqualTo("**** **** ***");
+    }
+
+    @Test
+    void toResponseReturnsNullForRestrictedResidentWithoutReleaseRole() {
+        Resident resident = resident(true);
+
+        assertThat(maskService.toResponse(resident, auth("WINDOW"), List.of("my_number", "jumin_code"))).isNull();
+    }
+
     private Resident resident(boolean restricted) {
         return new Resident(
             "R001",
