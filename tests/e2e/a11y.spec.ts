@@ -59,7 +59,7 @@ test("a11y: 異動画面", async ({ page }) => {
   await page.getByRole("button", { name: "検索", exact: true }).click();
   await page.waitForSelector("tbody tr");
   await page.locator("tbody tr").first().click();
-  await page.getByRole("button", { name: "異動" }).click();
+  await page.getByRole("button", { name: "異動", exact: true }).click();
   await page.waitForSelector("h2");
   const results = await new AxeBuilder({ page }).withTags(SCOPE_TAGS).analyze();
   expect(results.violations, prettyViolations(results.violations)).toEqual([]);

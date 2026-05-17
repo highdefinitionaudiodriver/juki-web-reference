@@ -60,8 +60,8 @@
 | 認証 | OIDC リソースサーバ + Keycloak dev IdP + Web PKCE、WebAuthn は足場 |
 | 抑止／項目別マスク | 設計仕様準拠で実装（WINDOW から DV 対象は 404、個人番号は要権限） |
 | 連携 (9 系統) | 戸籍連動は異動反映、CS/番号/税/国保/選挙は業務別ペイロード対応 |
-| E2E | Playwright API 13 件 PASS、a11y スイートあり |
-| Spring テスト | MockMvc + Testcontainers IT（Docker なし環境では IT skip） |
+| E2E | Playwright API 13 件 PASS、a11y 7 画面スイートあり |
+| Spring テスト | MockMvc + Testcontainers IT 55 件（Docker なし環境では IT 9 件 skip） |
 
 詳細は [`docs/gap_matrix.md`](docs/gap_matrix.md) を参照。
 

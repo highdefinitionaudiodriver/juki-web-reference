@@ -27,5 +27,6 @@ export default defineConfig({
     url: "http://localhost:8787/api/v1/me",
     reuseExistingServer: !process.env.CI,
     timeout: 30_000,
+    gracefulShutdown: { signal: "SIGTERM", timeout: 1000 },
   },
 });

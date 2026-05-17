@@ -102,7 +102,17 @@
 
 ### C. テスト
 1. Testcontainers IT を全コントローラに広げる
-2. Web 側の View レベル単体テスト（Vitest + Testing Library）を残り画面へ拡張
+2. ResidentController の MockMvc 単体テスト（`asOf` / `unmask` / 抑止 404）を拡張
+3. Web 側の App 統合テスト（ナビ切替・notice 表示）を追加
+
+## テスト自動化状況
+
+| 種別 | 現状 |
+| --- | --- |
+| Spring | 55 件（MockMvc 46 PASS + Testcontainers IT 9 SKIP: Docker なし環境） |
+| Vitest | 17 件 PASS（Search / Restriction / Certificate / Official / Move / Reports） |
+| Playwright API | 13 件 PASS |
+| Playwright a11y | 7 画面（住民検索／住民票／証明発行／抑止設定／異動／統計EUC／権限監査） |
 
 ## 結論
 
