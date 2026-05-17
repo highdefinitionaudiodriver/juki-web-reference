@@ -141,6 +141,7 @@ npm run e2e:spring
 ```
 
 `SPRING_OIDC_E2E` を未設定または `true` 以外にした場合、OIDC E2E は skip されます。
+GitHub Actions では `Spring OIDC E2E (Keycloak)` ジョブが同じ流れを自動実行します。
 
 ## 5. 本番運用での差し替えポイント
 

@@ -283,3 +283,93 @@ jobs:
           path: artifacts/pdfa/
           if-no-files-found: ignore
           retention-days: 7
+
+  spring-oidc-e2e:
+    name: Spring OIDC E2E (Keycloak)
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: "21"
+          cache: maven
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Start PostgreSQL and Keycloak
+        run: docker compose -f apps/api-spring/docker-compose.yaml up -d postgres keycloak
+
+      - name: Wait for Keycloak realm
+        run: |
+          for i in {1..80}; do
+            if curl -fsS http://localhost:8080/realms/juki/.well-known/openid-configuration >/dev/null; then
+              exit 0
+            fi
+            sleep 3
+          done
+          docker logs resident-keycloak || true
+          exit 1
+
+      - name: Build Spring jar
+        working-directory: apps/api-spring
+        run: mvn -B -DskipTests package
+
+      - name: Start Spring API with Keycloak issuer
+        working-directory: apps/api-spring
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/resident
+          DB_USER: resident
+          DB_PASSWORD: resident
+          OIDC_ISSUER: http://localhost:8080/realms/juki
+        run: |
+          nohup java -jar target/*.jar > spring-oidc.log 2>&1 &
+          echo $! > spring-oidc.pid
+
+      - name: Wait for Spring API
+        run: npx wait-on -t 180000 http://localhost:8788/actuator/health
+
+      - name: Run Spring OIDC E2E
+        env:
+          SPRING_OIDC_E2E: "true"
+          SPRING_BASE_URL: http://localhost:8788
+          KEYCLOAK_TOKEN_URL: http://localhost:8080/realms/juki/protocol/openid-connect/token
+          KEYCLOAK_CLIENT_ID: juki-web
+        run: npx playwright test -c playwright.spring.config.ts tests/e2e/spring-oidc.spec.ts
+
+      - name: Show logs on failure
+        if: failure()
+        run: |
+          cat apps/api-spring/spring-oidc.log || true
+          docker logs resident-keycloak || true
+
+      - name: Stop Spring API
+        if: always()
+        run: |
+          if [ -f apps/api-spring/spring-oidc.pid ]; then
+            kill "$(cat apps/api-spring/spring-oidc.pid)" || true
+          fi
+
+      - name: Stop containers
+        if: always()
+        run: docker compose -f apps/api-spring/docker-compose.yaml down -v
+
+      - name: Upload OIDC logs on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spring-oidc-e2e-logs
+          path: apps/api-spring/spring-oidc.log
+          if-no-files-found: ignore
+          retention-days: 7
