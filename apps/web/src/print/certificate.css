@@ -56,6 +56,7 @@
 .cert-paper table.cert th {
   width: 32mm;
   background: #f1ebd8;
+  color: #4f5f70;
   font-weight: 600;
   white-space: nowrap;
 }
@@ -120,7 +121,7 @@
   color: #000;
 }
 
-.cert-paper .masked { color: #888; letter-spacing: 0.1em; }
+.cert-paper .masked { color: #686868; letter-spacing: 0.1em; }
 
 /* プレビュー時の影 */
 @media screen {

@@ -28,7 +28,7 @@ h3{font-size:14px;margin:18px 0 8px}
 .topbar p,.muted,small{color:var(--muted)}
 small{display:block}
 .status-pill,.badge{display:inline-flex;align-items:center;min-height:24px;border-radius:999px;padding:0 10px;font-size:12px;white-space:nowrap}
-.status-pill{background:#e4f1f4;color:var(--accent)}
+.status-pill{background:#e4f1f4;color:#06636d}
 .notice{border-left:4px solid var(--accent);background:#eaf7f8;padding:10px 12px;margin-bottom:14px}
 .notice.err{border-color:var(--danger);background:#fdecea;color:var(--danger)}
 .panel{background:var(--panel);border:1px solid var(--line);border-radius:8px;padding:16px;box-shadow:0 1px 2px rgba(16,24,40,.05)}

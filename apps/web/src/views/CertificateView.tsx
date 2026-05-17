@@ -113,7 +113,7 @@ export function CertificateView({ resident, onIssue }: Props) {
           )}
         </form>
       </section>
-      <section style={{ overflow: "auto" }}>
+      <section aria-label="証明書プレビュー" tabIndex={0} style={{ overflow: "auto" }}>
         <CertificateTemplate
           resident={resident}
           issue={issued}

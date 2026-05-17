@@ -24,7 +24,7 @@ test("a11y: 住民検索画面", async ({ page }) => {
 
 test("a11y: 住民票画面", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "検索" }).click();
+  await page.getByRole("button", { name: "検索", exact: true }).click();
   await page.waitForSelector("tbody tr");
   await page.locator("tbody tr").first().click();
   await page.waitForSelector("h1");
@@ -34,7 +34,7 @@ test("a11y: 住民票画面", async ({ page }) => {
 
 test("a11y: 証明発行画面", async ({ page }) => {
   await page.goto("/");
-  await page.getByRole("button", { name: "検索" }).click();
+  await page.getByRole("button", { name: "検索", exact: true }).click();
   await page.waitForSelector("tbody tr");
   await page.locator("tbody tr").first().click();
   await page.getByRole("button", { name: "証明発行" }).click();
