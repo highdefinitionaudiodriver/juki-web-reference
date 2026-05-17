@@ -16,7 +16,9 @@ import { defineConfig } from "@playwright/test";
  *  - Spring 版は :8788 (Node 版は :8787)
  *  - 認証は Bearer JWT を要求するため、テストは X-Dev-Roles ヘッダではなく
  *    JWT を発行して Authorization に乗せる必要がある。
- *  - 現状は smoke 的にヘルスエンドポイントの疎通だけ確認するテストにとどめる。
+ *  - OIDC E2E は SPRING_OIDC_E2E=true のときだけ実行する。
+ *    Keycloak dev realm + Spring API を起動し、OIDC_ISSUER を
+ *    http://localhost:8080/realms/juki に向けること。
  */
 export default defineConfig({
   testDir: "tests/e2e",

@@ -115,6 +115,33 @@ curl http://localhost:8788/api/v1/residents/search -X POST `
   -d "{}"
 ```
 
+### Playwright での Spring OIDC E2E
+
+Keycloak / PostgreSQL / Spring API を起動した状態で、実 access token による `/me` と
+ロール不足 403 を確認できます。
+
+```powershell
+docker compose -f apps/api-spring/docker-compose.yaml up -d postgres keycloak
+$env:OIDC_ISSUER = "http://localhost:8080/realms/juki"
+$env:DB_URL = "jdbc:postgresql://localhost:5432/resident"
+$env:DB_USER = "resident"
+$env:DB_PASSWORD = "resident"
+cd apps/api-spring
+mvn -B spring-boot:run
+```
+
+別ターミナル:
+
+```powershell
+$env:SPRING_OIDC_E2E = "true"
+$env:KEYCLOAK_TOKEN_URL = "http://localhost:8080/realms/juki/protocol/openid-connect/token"
+$env:KEYCLOAK_CLIENT_ID = "juki-web"
+$env:SPRING_BASE_URL = "http://localhost:8788"
+npm run e2e:spring
+```
+
+`SPRING_OIDC_E2E` を未設定または `true` 以外にした場合、OIDC E2E は skip されます。
+
 ## 5. 本番運用での差し替えポイント
 
 - `juki-realm.json` のパスワード（テストユーザ）は **必ず削除**
