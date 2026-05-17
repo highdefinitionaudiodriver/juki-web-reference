@@ -109,8 +109,8 @@
 
 | 種別 | 現状 |
 | --- | --- |
-| Spring | 81 件（MockMvc/Unit 72 PASS + Testcontainers IT 9 SKIP: Docker なし環境） |
-| Vitest | 41 件 PASS（App / Search / Resident / Restriction / Certificate / Official / Move / Reports） |
+| Spring | 85 件（MockMvc/Unit 72 PASS + Testcontainers IT 13 SKIP: Docker なし環境） |
+| Vitest | 42 件 PASS（App / Search / Resident / Restriction / Certificate / Official / Move / Reports） |
 | Playwright API | 13 件 PASS |
 | Playwright a11y | 7 画面（住民検索／住民票／証明発行／抑止設定／異動／統計EUC／権限監査） |
 | CI | OpenAPI diff ジョブで `c_openapi.yaml` と Spring runtime `/v3/api-docs` を比較 |

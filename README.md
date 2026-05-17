@@ -4,6 +4,7 @@
 > **ChromeOS Flex でも動作する** Web アプリケーションのリファレンス実装。
 
 [![License: MIT](https://img.shields.io/badge/license-MIT-blue.svg)](LICENSE)
+[![CI](https://github.com/highdefinitionaudiodriver/juki-web-reference/actions/workflows/ci.yml/badge.svg)](https://github.com/highdefinitionaudiodriver/juki-web-reference/actions/workflows/ci.yml)
 ![Status: WIP](https://img.shields.io/badge/status-work%20in%20progress-orange)
 ![Node](https://img.shields.io/badge/node-%E2%89%A520-339933?logo=node.js&logoColor=white)
 ![Java](https://img.shields.io/badge/java-21-007396?logo=openjdk&logoColor=white)
@@ -70,8 +71,8 @@
 
 | レイヤ | テストランナ | 件数 | 内訳 |
 |---|---|---:|---|
-| Spring API Controller | MockMvc | 56 | Auth(3) / Resident(8) / ResidentSupplement(5) / Transaction(13) / Certificate(8) / Restriction(6) / Report(4) / Link(7) / Admin(7) / Audit(2) / EUC(3) |
-| Spring Service / Authz | JUnit | 8 | MaskService(5) / CertificatePdfService(1) / その他(2) |
+| Spring API Controller | MockMvc | 66 | Auth(3) / Resident(8) / ResidentSupplement(5) / Transaction(13) / Certificate(8) / Restriction(6) / Report(4) / Link(7) / Admin(7) / Audit(2) / EUC(3) |
+| Spring Service / Authz | JUnit | 6 | MaskService(5) / CertificatePdfService(1) |
 | Spring Integration | Testcontainers + Spring Boot | 13 | ResidentApiIT(2) / HouseholdSplitMergeIT(2) / KosekiIT(5) / AdminIT(4) — Linux runner + Docker で実行、ローカル Docker なしは skip |
 | Web React コンポーネント | Vitest + RTL | 42 | App(15) / View 7 ファイル(27) |
 | Node API ロジック | Node スモーク | 1 | seed の住民検索結果でロール別マスク確認 |
@@ -79,7 +80,7 @@
 | Web ブラウザ a11y | Playwright + axe-core | 7 | 住民検索 / 住民票 / 証明発行 / 抑止設定 / 異動 / 統計-EUC / 権限-監査 |
 | 仕様 ⇔ 実装 ドリフト | OpenAPI diff (CI) | 1 | drift=0 維持 |
 
-**合計 142 ケースを CI で自動検証**。Linux runner + Docker 環境では IT も含めて全件 PASS。
+**合計 149 ケースを CI で自動検証**。Linux runner + Docker 環境では IT も含めて全件 PASS。
 
 ## クイックスタート
 

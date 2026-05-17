@@ -28,6 +28,7 @@ import { fallbackAuditLogs, fallbackMe, fallbackResidents, fallbackTransactions 
 import { getToken } from "./auth";
 
 const base = "/api/v1";
+const enableFallbackData = import.meta.env.DEV || import.meta.env.VITE_ENABLE_FALLBACK_DATA === "true";
 
 async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   const headers = new Headers(init.headers);
@@ -44,12 +45,16 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   async me(): Promise<Me> {
-    try { return await request<Me>("/me"); } catch { return fallbackMe; }
+    try { return await request<Me>("/me"); } catch (e) {
+      if (!enableFallbackData) throw e;
+      return fallbackMe;
+    }
   },
   async searchResidents(criteria: Partial<ResidentSearchReq>): Promise<PagedResidents> {
     try {
       return await request<PagedResidents>("/residents/search", { method: "POST", body: criteria as unknown as BodyInit });
-    } catch {
+    } catch (e) {
+      if (!enableFallbackData) throw e;
       const items = fallbackResidents.filter((r) =>
         (!criteria.name || `${r.familyNameKanji ?? ""}${r.givenNameKanji ?? ""}`.includes(criteria.name)) &&
         (!criteria.address || (r.addressText ?? "").includes(criteria.address)) &&
@@ -61,7 +66,8 @@ export const api = {
   async resident(id: string, unmask = false): Promise<Resident> {
     const qs = unmask ? "?unmask=my_number&unmask=jumin_code" : "";
     try { return await request<Resident>(`/residents/${id}${qs}`); }
-    catch {
+    catch (e) {
+      if (!enableFallbackData) throw e;
       const fallback = fallbackResidents.find((r) => r.residentId === id);
       if (!fallback) throw new Error("not found");
       return fallback;
@@ -71,7 +77,10 @@ export const api = {
     request<Resident>(`/residents/${id}`, { method: "PUT", body: patch as unknown as BodyInit }),
   async history(id: string): Promise<Transaction[]> {
     try { return await request<Transaction[]>(`/residents/${id}/history`); }
-    catch { return fallbackTransactions.filter((tx) => tx.residentId === id); }
+    catch (e) {
+      if (!enableFallbackData) throw e;
+      return fallbackTransactions.filter((tx) => tx.residentId === id);
+    }
   },
   moveIn: (body: MoveInReq) => request<Transaction>("/transactions/in", { method: "POST", body: body as unknown as BodyInit }),
   moveOut: (body: MoveOutReq) => request<Transaction & { certificate: CertificateIssue }>("/transactions/out", { method: "POST", body: body as unknown as BodyInit }),
@@ -89,7 +98,10 @@ export const api = {
     request<ForeignerExpiryJob>("/reports/foreigner-expiring", { method: "POST", body: body as unknown as BodyInit }),
   eucQuery: (body: EucQueryReq) => request<EucAsyncJob>("/euc/query", { method: "POST", body: body as unknown as BodyInit }),
   async audit(): Promise<AuditLog[]> {
-    try { return await request<AuditLog[]>("/audit"); } catch { return fallbackAuditLogs; }
+    try { return await request<AuditLog[]>("/audit"); } catch (e) {
+      if (!enableFallbackData) throw e;
+      return fallbackAuditLogs;
+    }
   },
   createRestriction: (body: {
     residentId: string;
