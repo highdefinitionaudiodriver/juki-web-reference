@@ -379,4 +379,49 @@ describe("App", () => {
       expect(screen.getByText(/EUC結果を作成しました/)).toBeInTheDocument();
     });
   });
+
+  it("フルパス: 住民選択 → 異動ビューで最新異動を取消 → notice 表示", async () => {
+    // 初回起動時に api.history が返す履歴に取消対象 1 件を含める
+    apiMocks.history.mockResolvedValue([
+      {
+        transactionId: "TX-LATEST",
+        residentId: "R-001",
+        householdId: "H-001",
+        typeCode: "MOVE",
+        reasonCode: "ADDRESS_FIX",
+        eventDate: "2026-04-01",
+        processedDate: "2026-04-01",
+        receiverOffice: "住民課",
+        status: "APPLIED",
+        parentTransactionId: null,
+        items: [],
+      },
+    ]);
+    // cancelTransaction モックを apiMocks に動的追加
+    const cancelMock = vi.fn().mockResolvedValue({
+      transactionId: "TX-CANCEL",
+      typeCode: "CANCEL",
+      parentTransactionId: "TX-LATEST",
+    });
+    (apiMocks as unknown as Record<string, unknown>).cancelTransaction = cancelMock;
+
+    render(<App />);
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByText("山田 太郎").length).toBeGreaterThan(0));
+
+    // 異動ビューへ遷移し、最新異動の取消ボタンが表示されるまで待つ
+    await user.click(screen.getByRole("button", { name: "異動" }));
+    await waitFor(() =>
+      expect(screen.getByRole("button", { name: /最新異動を取消/ })).toBeInTheDocument()
+    );
+    await user.click(screen.getByRole("button", { name: /最新異動を取消/ }));
+
+    await waitFor(() => {
+      expect(cancelMock).toHaveBeenCalledWith({
+        transactionId: "TX-LATEST",
+        reason: "入力誤りのため取消",
+      });
+      expect(screen.getByText(/異動取消を登録しました: TX-CANCEL/)).toBeInTheDocument();
+    });
+  });
 });
