@@ -109,7 +109,7 @@
 
 | 種別 | 現状 |
 | --- | --- |
-| Spring | 91 件（MockMvc/Unit 73 PASS + Testcontainers IT 18 SKIP: Docker なし環境） |
+| Spring | 94 件（MockMvc/Unit 75 PASS + Testcontainers IT 19 SKIP: Docker なし環境） |
 | Vitest | 42 件 PASS（App / Search / Resident / Restriction / Certificate / Official / Move / Reports） |
 | Playwright API | 13 件 PASS |
 | Playwright a11y | 7 画面（住民検索／住民票／証明発行／抑止設定／異動／統計EUC／権限監査） |

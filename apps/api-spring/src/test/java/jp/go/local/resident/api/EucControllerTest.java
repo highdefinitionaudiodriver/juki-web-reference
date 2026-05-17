@@ -2,15 +2,21 @@ package jp.go.local.resident.api;
 
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 import static org.mockito.ArgumentMatchers.any;
+import static org.mockito.ArgumentMatchers.anyString;
+import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
 
+import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
+import java.util.zip.ZipInputStream;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -56,7 +62,7 @@ class EucControllerTest {
             .andExpect(jsonPath("$.jobId").value("EUC-42"))
             .andExpect(jsonPath("$.status").value("DONE"))
             .andExpect(jsonPath("$.progress").value(100))
-            .andExpect(jsonPath("$.resultUrl").value("/euc/result.csv"))
+            .andExpect(jsonPath("$.resultUrl").value("/api/v1/euc/EUC-42/result.zip"))
             .andExpect(jsonPath("$.requiresSecondApproval").value(false));
     }
 
@@ -88,6 +94,42 @@ class EucControllerTest {
             .andExpect(status().isAccepted())
             .andExpect(jsonPath("$.status").value("QUEUED"))
             .andExpect(jsonPath("$.requiresSecondApproval").value(true));
+    }
+
+    @Test
+    void download_doneJob_returnsZipWithCsv() throws Exception {
+        when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(42L)))
+            .thenReturn(Map.of(
+                "status", "DONE",
+                "params", "{\"outputFields\":[\"residentId\",\"name\",\"addressText\"]}"
+            ));
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("from resident"))).thenReturn(List.of(
+            Map.of("residentId", "R001", "name", "住民 太郎", "addressText", "東京都サンプル市1-1")
+        ));
+
+        byte[] body = mvc.perform(get("/api/v1/euc/EUC-42/result.zip")
+                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN")))))
+            .andExpect(status().isOk())
+            .andReturn().getResponse().getContentAsByteArray();
+
+        try (ZipInputStream zip = new ZipInputStream(new java.io.ByteArrayInputStream(body), StandardCharsets.UTF_8)) {
+            org.assertj.core.api.Assertions.assertThat(zip.getNextEntry().getName()).isEqualTo("EUC-42-result.csv");
+            String csv = new String(zip.readAllBytes(), StandardCharsets.UTF_8);
+            org.assertj.core.api.Assertions.assertThat(csv).contains("residentId,name,addressText");
+            org.assertj.core.api.Assertions.assertThat(csv).contains("\"R001\",\"住民 太郎\",\"東京都サンプル市1-1\"");
+        }
+    }
+
+    @Test
+    void download_queuedJob_returns409() throws Exception {
+        when(jdbc.queryForMap(anyString(), eq(43L))).thenReturn(Map.of(
+            "status", "QUEUED",
+            "params", "{\"outputFields\":[\"residentId\",\"myNumber\"],\"includeMyNumber\":true}"
+        ));
+
+        mvc.perform(get("/api/v1/euc/EUC-43/result.zip")
+                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN")))))
+            .andExpect(status().isConflict());
     }
 
     @TestConfiguration

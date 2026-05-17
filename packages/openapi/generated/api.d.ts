@@ -1283,7 +1283,7 @@ export interface paths {
         put?: never;
         /**
          * EUC（任意抽出）
-         * @description 個人番号が出力対象に含まれる場合は二段階承認、結果はパスワード付ZIP配信。
+         * @description 個人番号が出力対象に含まれる場合は二段階承認、二段階承認不要の結果は ZIP 配信。
          */
         post: {
             parameters: {
@@ -1309,6 +1309,61 @@ export interface paths {
                 };
             };
         };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/euc/{jobId}/result.zip": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * EUC 抽出結果 ZIP 取得
+         * @description 二段階承認不要の DONE ジョブのみ CSV を ZIP で返す。個人番号を含む QUEUED ジョブは 409。パスワード付 ZIP 暗号化は後続。
+         */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    jobId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description ZIP */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/zip": string;
+                    };
+                };
+                /** @description ジョブなし */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 二段階承認待ちまたは未完了 */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
         delete?: never;
         options?: never;
         head?: never;

@@ -296,10 +296,24 @@ paths:
     post:
       tags: [euc]
       summary: EUC（任意抽出）
-      description: 個人番号が出力対象に含まれる場合は二段階承認、結果はパスワード付ZIP配信。
+      description: 個人番号が出力対象に含まれる場合は二段階承認、二段階承認不要の結果は ZIP 配信。
       requestBody: { required: true, content: { application/json: { schema: { $ref: '#/components/schemas/EucQueryReq' } } } }
       responses:
         '202': { description: 受付, content: { application/json: { schema: { $ref: '#/components/schemas/AsyncJob' } } } }
+  /euc/{jobId}/result.zip:
+    get:
+      tags: [euc]
+      summary: EUC 抽出結果 ZIP 取得
+      description: 二段階承認不要の DONE ジョブのみ CSV を ZIP で返す。個人番号を含む QUEUED ジョブは 409。パスワード付 ZIP 暗号化は後続。
+      parameters: [ { name: jobId, in: path, required: true, schema: { type: string, pattern: '^EUC-[0-9]+$' } } ]
+      responses:
+        '200':
+          description: ZIP
+          content:
+            application/zip:
+              schema: { type: string, format: binary }
+        '404': { description: ジョブなし }
+        '409': { description: 二段階承認待ちまたは未完了 }
 
   # ===== 連携 =====
   /link/cs/inbound:

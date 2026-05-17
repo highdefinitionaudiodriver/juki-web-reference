@@ -3,10 +3,14 @@ package jp.go.local.resident;
 import static org.assertj.core.api.Assertions.assertThat;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.csrf;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
 
 import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
+import java.nio.charset.StandardCharsets;
+import java.time.OffsetDateTime;
+import java.util.zip.ZipInputStream;
 import org.junit.jupiter.api.Test;
 import org.junit.jupiter.api.extension.ExtendWith;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -65,7 +69,7 @@ class EucIT {
             .isEqualTo("DONE");
         assertThat(jdbc.queryForObject(
             "select result_url from report_request where request_id = ?", String.class, requestId))
-            .isEqualTo("/euc/result.csv");
+            .isEqualTo("/api/v1/euc/EUC-" + requestId + "/result.zip");
         assertThat(jdbc.queryForObject(
             "select params -> 'outputFields' ->> 0 from report_request where request_id = ?",
             String.class, requestId)).isEqualTo("residentId");
@@ -101,6 +105,39 @@ class EucIT {
             String.class, requestId)).isEqualTo("true");
     }
 
+    @Test
+    void downloadDoneRequest_returnsZipCsvFromResidentRows() throws Exception {
+        String userId = "euc-user-download-" + System.currentTimeMillis();
+        String residentId = "R-EUC-" + System.currentTimeMillis();
+        seedUser(userId);
+        seedResident(residentId);
+
+        MvcResult res = mvc.perform(post("/api/v1/euc/query")
+                .with(jwt().jwt(j -> j.subject(userId)).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"outputFields":["residentId","name","addressText"]}
+                    """))
+            .andReturn();
+        JsonNode body = objectMapper.readTree(res.getResponse().getContentAsString());
+
+        MvcResult zipRes = mvc.perform(get("/api/v1/euc/{jobId}/result.zip", body.get("jobId").asText())
+                .with(jwt().jwt(j -> j.subject(userId)).authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            .andReturn();
+
+        assertThat(zipRes.getResponse().getStatus()).isEqualTo(200);
+        assertThat(zipRes.getResponse().getContentType()).isEqualTo("application/zip");
+        try (ZipInputStream zip = new ZipInputStream(
+                new java.io.ByteArrayInputStream(zipRes.getResponse().getContentAsByteArray()), StandardCharsets.UTF_8)) {
+            assertThat(zip.getNextEntry().getName()).endsWith("-result.csv");
+            String csv = new String(zip.readAllBytes(), StandardCharsets.UTF_8);
+            assertThat(csv).contains("residentId,name,addressText");
+            assertThat(csv).contains(residentId);
+            assertThat(csv).contains("EUC 検証");
+        }
+    }
+
     private long requestId(JsonNode body) {
         return Long.parseLong(body.get("jobId").asText().replace("EUC-", ""));
     }
@@ -110,5 +147,21 @@ class EucIT {
             insert into user_account (user_id, employee_no, department, full_name)
             values (?, 'EUC-001', '情報政策課', 'EUC 検証')
             """, userId);
+    }
+
+    private void seedResident(String residentId) {
+        String householdId = "H-" + residentId;
+        jdbc.update("""
+            insert into household (household_id, address_text, established_date)
+            values (?, '東京都サンプル市EUC1-1', '2020-01-01')
+            """, householdId);
+        jdbc.update("""
+            insert into resident
+              (resident_id, household_id, family_name_kanji, given_name_kanji, family_name_kana, given_name_kana,
+               birth_date, sex, address_text, moved_in_date, restricted_flag, valid_from)
+            values (?, ?, 'EUC', '検証', 'イーユーシー', 'ケンショウ',
+                    '1990-01-01', 'U', '東京都サンプル市EUC1-1', '2020-01-01', false, ?)
+            """, residentId, householdId, OffsetDateTime.now());
+        jdbc.update("update household set head_resident_id = ? where household_id = ?", residentId, householdId);
     }
 }
