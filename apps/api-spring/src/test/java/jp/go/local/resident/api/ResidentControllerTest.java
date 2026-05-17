@@ -8,6 +8,7 @@ import static org.mockito.Mockito.when;
 import static org.springframework.security.test.web.servlet.request.SecurityMockMvcRequestPostProcessors.jwt;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.get;
 import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.post;
+import static org.springframework.test.web.servlet.request.MockMvcRequestBuilders.put;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.jsonPath;
 import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.status;
 
@@ -140,6 +141,36 @@ class ResidentControllerTest {
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].transactionId").value("TX-1"))
             .andExpect(jsonPath("$[0].typeCode").value("ADDRESS_FIX"));
+    }
+
+    @Test
+    void patch_whenVisible_returnsAcceptedPatch() throws Exception {
+        Resident resident = resident(false);
+        when(repository.findById("R001")).thenReturn(Optional.of(resident));
+        when(maskService.applyResidentMask(eq(resident), any(Authentication.class))).thenReturn(resident);
+
+        mvc.perform(put("/api/v1/residents/R001")
+                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN"))))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"addressText\":\"東京都サンプル市中央町9-9\",\"reasonCode\":\"LIGHT_FIX\"}"))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.residentId").value("R001"))
+            .andExpect(jsonPath("$.status").value("ACCEPTED"))
+            .andExpect(jsonPath("$.patch.addressText").value("東京都サンプル市中央町9-9"))
+            .andExpect(jsonPath("$.patch.reasonCode").value("LIGHT_FIX"));
+    }
+
+    @Test
+    void patch_whenMaskedByRestriction_returns404() throws Exception {
+        Resident resident = resident(true);
+        when(repository.findById("R001")).thenReturn(Optional.of(resident));
+        when(maskService.applyResidentMask(eq(resident), any(Authentication.class))).thenReturn(null);
+
+        mvc.perform(put("/api/v1/residents/R001")
+                .with(jwt().jwt(j -> j.claim("roles", List.of("WINDOW"))))
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("{\"addressText\":\"東京都サンプル市中央町9-9\"}"))
+            .andExpect(status().isNotFound());
     }
 
     private static Resident resident(boolean restricted) {
