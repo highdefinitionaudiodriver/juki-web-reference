@@ -70,4 +70,42 @@ describe("CertificateView", () => {
     expect(screen.getByText("PDF を表示")).toHaveAttribute("href", "/api/v1/certificates/10/pdf");
     expect(screen.getByText(/改ざん防止コード検証/)).toHaveAttribute("href", "/api/v1/verify/VTESTTOKEN");
   });
+
+  it("様式・範囲・個人番号表示フラグを CertificateReq に反映する", async () => {
+    const onIssue = vi.fn().mockResolvedValue({
+      ...issue,
+      formId: "0010003",
+      copies: 1,
+      fee: 300,
+    });
+    render(<CertificateView resident={resident} onIssue={onIssue} />);
+    const user = userEvent.setup();
+
+    await user.selectOptions(screen.getByLabelText("様式"), "0010003");
+    await user.selectOptions(screen.getByLabelText("範囲"), "HOUSEHOLD");
+    await user.click(screen.getByLabelText("個人番号を表示（要権限）"));
+    await user.click(screen.getByRole("button", { name: "発行" }));
+
+    expect(onIssue).toHaveBeenCalledWith(expect.objectContaining({
+      residentId: "R-001",
+      formId: "0010003",
+      scope: "HOUSEHOLD",
+      copies: 1,
+      usageText: "窓口請求",
+      showJuminCode: false,
+      showMyNumber: true,
+    }));
+    expect(await screen.findByText(/発行済/)).toBeInTheDocument();
+  });
+
+  it("印刷プレビューで window.print を呼ぶ", async () => {
+    const print = vi.spyOn(window, "print").mockImplementation(() => {});
+    render(<CertificateView resident={resident} onIssue={vi.fn()} />);
+    const user = userEvent.setup();
+
+    await user.click(screen.getByRole("button", { name: "印刷プレビュー" }));
+
+    expect(print).toHaveBeenCalled();
+    print.mockRestore();
+  });
 });

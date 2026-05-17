@@ -78,4 +78,32 @@ describe("OfficialView", () => {
     expect(onApprove).toHaveBeenCalledWith("TX-001", { action: "APPROVE", comment: "承認します" });
     expect(await screen.findByText(/OFFICIAL_FIX \/ APPLIED/)).toBeInTheDocument();
   });
+
+  it("差戻しボタンで onApprove(txId, REMAND) が呼ばれ、状態が更新される", async () => {
+    const onApprove = vi.fn().mockResolvedValue({ transactionId: "TX-001", status: "REMANDED", step: 1 });
+    render(<OfficialView resident={resident} latestOfficial={draft} onCreate={vi.fn()} onApprove={onApprove} />);
+    const user = userEvent.setup();
+
+    await user.type(screen.getByLabelText("コメント"), "補足資料を追加してください");
+    await user.click(screen.getByRole("button", { name: "REMAND" }));
+
+    expect(onApprove).toHaveBeenCalledWith("TX-001", { action: "REMAND", comment: "補足資料を追加してください" });
+    expect(await screen.findByText(/OFFICIAL_FIX \/ REMANDED/)).toBeInTheDocument();
+  });
+
+  it("APPLIED の決裁済み職権異動は各決裁ボタンを無効化する", () => {
+    render(
+      <OfficialView
+        resident={resident}
+        latestOfficial={{ ...draft, status: "APPLIED" }}
+        onCreate={vi.fn()}
+        onApprove={vi.fn()}
+      />
+    );
+
+    expect(screen.getByRole("button", { name: "APPROVE" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "CONDITIONAL" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "REMAND" })).toBeDisabled();
+    expect(screen.getByRole("button", { name: "REJECT" })).toBeDisabled();
+  });
 });
