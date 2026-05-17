@@ -43,6 +43,46 @@ test("a11y: 証明発行画面", async ({ page }) => {
   expect(results.violations, prettyViolations(results.violations)).toEqual([]);
 });
 
+test("a11y: 抑止設定画面 (SCR-301)", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "検索", exact: true }).click();
+  await page.waitForSelector("tbody tr");
+  await page.locator("tbody tr").first().click();
+  await page.getByRole("button", { name: "抑止設定" }).click();
+  await page.waitForSelector("h2");
+  const results = await new AxeBuilder({ page }).withTags(SCOPE_TAGS).analyze();
+  expect(results.violations, prettyViolations(results.violations)).toEqual([]);
+});
+
+test("a11y: 異動画面", async ({ page }) => {
+  await page.goto("/");
+  await page.getByRole("button", { name: "検索", exact: true }).click();
+  await page.waitForSelector("tbody tr");
+  await page.locator("tbody tr").first().click();
+  await page.getByRole("button", { name: "異動" }).click();
+  await page.waitForSelector("h2");
+  const results = await new AxeBuilder({ page }).withTags(SCOPE_TAGS).analyze();
+  expect(results.violations, prettyViolations(results.violations)).toEqual([]);
+});
+
+test("a11y: 統計/EUC 画面", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".shell");
+  await page.getByRole("button", { name: "統計/EUC" }).click();
+  await page.waitForSelector("h2");
+  const results = await new AxeBuilder({ page }).withTags(SCOPE_TAGS).analyze();
+  expect(results.violations, prettyViolations(results.violations)).toEqual([]);
+});
+
+test("a11y: 権限/監査 画面", async ({ page }) => {
+  await page.goto("/");
+  await page.waitForSelector(".shell");
+  await page.getByRole("button", { name: "権限/監査" }).click();
+  await page.waitForSelector("h2");
+  const results = await new AxeBuilder({ page }).withTags(SCOPE_TAGS).analyze();
+  expect(results.violations, prettyViolations(results.violations)).toEqual([]);
+});
+
 function prettyViolations(violations: unknown[]): string {
   return JSON.stringify(violations, null, 2);
 }
