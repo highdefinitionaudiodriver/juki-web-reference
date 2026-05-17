@@ -38,8 +38,15 @@ try {
   exit(2);
 }
 
-const specOps = collectOperations(spec);
-const runtimeOps = collectOperations(runtime);
+// servers.url のパス部分を共通プレフィクスとして抽出
+//   c_openapi.yaml: servers.url = "https://{tenant}.juki.example.go.jp/api/v1" → "/api/v1"
+//   Spring runtime: paths は @RequestMapping("/api/v1/...") を含んだ絶対パス
+// 比較前に両者を同じ基準（/api/v1 含み）に揃える。
+const specBase = serverBasePath(spec);
+const runtimeBase = serverBasePath(runtime);
+
+const specOps = collectOperations(spec, specBase);
+const runtimeOps = collectOperations(runtime, runtimeBase);
 
 const onlyInSpec = [...specOps].filter((o) => !runtimeOps.has(o)).sort();
 const onlyInRuntime = [...runtimeOps].filter((o) => !specOps.has(o)).sort();
@@ -64,13 +71,48 @@ if (drift === 0) {
 console.log(`\n✗ drift: ${drift} operations`);
 exit(1);
 
-function collectOperations(doc) {
+function collectOperations(doc, basePath = "") {
   const set = new Set();
   if (!doc?.paths) return set;
-  for (const [path, methods] of Object.entries(doc.paths)) {
+  for (const [rawPath, methods] of Object.entries(doc.paths)) {
+    const normalized = normalizePath(rawPath, basePath);
     for (const method of ["get", "put", "post", "delete", "patch", "head", "options"]) {
-      if (methods?.[method]) set.add(`${method.toUpperCase()} ${path}`);
+      if (methods?.[method]) set.add(`${method.toUpperCase()} ${normalized}`);
     }
   }
   return set;
+}
+
+/**
+ * doc.servers[0].url からパス部分（例: "/api/v1"）を返す。
+ * テンプレ変数 ({tenant} 等) は無視。サーバ未指定は空文字。
+ */
+function serverBasePath(doc) {
+  const url = doc?.servers?.[0]?.url;
+  if (!url) return "";
+  try {
+    // テンプレ展開は不要、パス部分だけ取れれば良いので、URL コンストラクタが
+    // 失敗する URL も自前で抽出する。
+    const m = url.match(/^[a-z]+:\/\/[^/]+(\/.*)?$/i);
+    return m && m[1] ? m[1].replace(/\/$/, "") : "";
+  } catch {
+    return "";
+  }
+}
+
+/**
+ * パス文字列を比較用に正規化する。
+ *
+ *   - basePath が空ならそのまま、含むなら付与（/residents → /api/v1/residents）
+ *   - パス変数名は構造比較のため `{_}` に統一
+ *     (spec: `/residents/{residentId}` と runtime: `/residents/{id}` を同一視)
+ */
+function normalizePath(path, basePath) {
+  let p = path;
+  if (basePath && !(p.startsWith(basePath + "/") || p === basePath)) {
+    p = basePath + p;
+  }
+  // パス変数名を {_} に統一
+  p = p.replace(/\{[^}]+\}/g, "{_}");
+  return p;
 }

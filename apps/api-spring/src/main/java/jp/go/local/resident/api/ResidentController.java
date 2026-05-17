@@ -98,6 +98,28 @@ public class ResidentController {
         return ResponseEntity.ok(historyRepository.listTransactions(id));
     }
 
+    /**
+     * 軽微な単項目修正（住所表記の修正など）。
+     * 本来は /transactions/move 等を使うが、誤字修正レベルはこちらで簡易処理。
+     */
+    @org.springframework.web.bind.annotation.PutMapping("/{id}")
+    public ResponseEntity<Map<String, Object>> patch(
+        @PathVariable("id") String id,
+        @RequestBody Map<String, Object> body,
+        Authentication authentication
+    ) {
+        var resident = repository.findById(id).orElse(null);
+        if (resident == null || maskService.applyResidentMask(resident, authentication) == null) {
+            return ResponseEntity.notFound().build();
+        }
+        Map<String, Object> response = new java.util.LinkedHashMap<>();
+        response.put("residentId", id);
+        response.put("status", "ACCEPTED");
+        response.put("patch", body);
+        response.put("note", "Spring 版の軽微修正はスタブ実装。実運用では /transactions/move 等を使用してください。");
+        return ResponseEntity.ok(response);
+    }
+
     private static OffsetDateTime parseOffsetDateTime(String s) {
         try {
             return OffsetDateTime.parse(s);
