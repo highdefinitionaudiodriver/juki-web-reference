@@ -72,6 +72,27 @@ const apiMocks = vi.hoisted(() => ({
     reasonCode: "OFFICIAL_FIX",
     status: "DRAFT",
   }),
+  issueCertificate: vi.fn().mockResolvedValue({
+    issueId: "CI-1",
+    formId: "0010001",
+    verifyToken: "VTOKEN",
+    fee: 300,
+  }),
+  createRestriction: vi.fn().mockResolvedValue({ id: "RST-1" }),
+  deleteRestriction: vi.fn().mockResolvedValue(null),
+  annualReport: vi.fn().mockResolvedValue({
+    jobId: "JOB-ANNUAL",
+    status: "DONE",
+    progress: 100,
+    resultUrl: "/reports/annual.xlsx",
+  }),
+  eucQuery: vi.fn().mockResolvedValue({
+    jobId: "JOB-EUC",
+    status: "DONE",
+    progress: 100,
+    resultUrl: "/euc/result.csv",
+    requiresSecondApproval: false,
+  }),
 }));
 
 vi.mock("./api", () => ({
@@ -196,6 +217,55 @@ describe("App", () => {
     render(<App />);
     await waitFor(() => {
       expect(screen.getByText(/network down/)).toBeInTheDocument();
+    });
+  });
+
+  it("証明発行後に verifyToken と手数料の notice を表示する", async () => {
+    render(<App />);
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByText("山田 太郎").length).toBeGreaterThan(0));
+    await user.click(screen.getByRole("button", { name: "証明発行" }));
+    await user.click(screen.getByRole("button", { name: "発行" }));
+    await waitFor(() => {
+      expect(apiMocks.issueCertificate).toHaveBeenCalled();
+      // notice メッセージで verifyToken と手数料を含む文言が含まれる
+      expect(screen.getByText(/証明書を発行しました。検証トークン: VTOKEN \/ 手数料: 300円/)).toBeInTheDocument();
+    });
+  });
+
+  it("抑止登録後に成功 notice を表示する", async () => {
+    render(<App />);
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByText("山田 太郎").length).toBeGreaterThan(0));
+    await user.click(screen.getByRole("button", { name: "抑止設定" }));
+    await user.click(screen.getByRole("button", { name: "抑止を登録" }));
+    await waitFor(() => {
+      expect(apiMocks.createRestriction).toHaveBeenCalled();
+      expect(screen.getByText(/抑止を登録しました: R-001/)).toBeInTheDocument();
+    });
+  });
+
+  it("住基年報の集計依頼後に notice を表示する", async () => {
+    render(<App />);
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByText("山田 太郎").length).toBeGreaterThan(0));
+    await user.click(screen.getByRole("button", { name: "統計/EUC" }));
+    await user.click(screen.getByRole("button", { name: "集計" }));
+    await waitFor(() => {
+      expect(apiMocks.annualReport).toHaveBeenCalled();
+      expect(screen.getByText(/年報ジョブを受け付けました: JOB-ANNUAL/)).toBeInTheDocument();
+    });
+  });
+
+  it("EUC 抽出依頼後に結果 URL の notice を表示する", async () => {
+    render(<App />);
+    const user = userEvent.setup();
+    await waitFor(() => expect(screen.getAllByText("山田 太郎").length).toBeGreaterThan(0));
+    await user.click(screen.getByRole("button", { name: "統計/EUC" }));
+    await user.click(screen.getByRole("button", { name: "抽出依頼" }));
+    await waitFor(() => {
+      expect(apiMocks.eucQuery).toHaveBeenCalled();
+      expect(screen.getByText(/EUC結果を作成しました/)).toBeInTheDocument();
     });
   });
 });
