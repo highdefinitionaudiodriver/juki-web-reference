@@ -90,3 +90,86 @@ jobs:
           path: apps/api-spring/target/surefire-reports/
           if-no-files-found: ignore
           retention-days: 7
+
+  openapi-diff:
+    name: OpenAPI diff (spec ⇔ Spring runtime)
+    runs-on: ubuntu-latest
+    timeout-minutes: 15
+    services:
+      postgres:
+        image: postgres:16
+        env:
+          POSTGRES_DB: resident
+          POSTGRES_USER: resident
+          POSTGRES_PASSWORD: resident
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U resident -d resident"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - name: Checkout
+        uses: actions/checkout@v4
+
+      - name: Setup Node.js
+        uses: actions/setup-node@v4
+        with:
+          node-version: 24
+          cache: npm
+
+      - name: Setup Java 21
+        uses: actions/setup-java@v4
+        with:
+          distribution: microsoft
+          java-version: "21"
+          cache: maven
+
+      - name: Install Node dependencies
+        run: npm ci
+
+      - name: Build Spring jar
+        working-directory: apps/api-spring
+        run: mvn -B -DskipTests package
+
+      - name: Start Spring API in background
+        working-directory: apps/api-spring
+        env:
+          DB_URL: jdbc:postgresql://localhost:5432/resident
+          DB_USER: resident
+          DB_PASSWORD: resident
+          # ci プロファイル: 認可を無効化（CiSecurityConfig）。JWKS 取得もスキップ。
+          # /v3/api-docs を取得するためだけの最小構成。
+          SPRING_PROFILES_ACTIVE: ci
+        run: |
+          nohup java -jar target/*.jar --spring.profiles.active=ci > spring.log 2>&1 &
+          echo $! > spring.pid
+
+      - name: Wait for Spring API
+        run: npx wait-on -t 90000 http://localhost:8788/v3/api-docs http://localhost:8788/actuator/health
+
+      - name: Run OpenAPI diff
+        run: npm run openapi:diff -- --spring http://localhost:8788/v3/api-docs --spec c_openapi.yaml
+        continue-on-error: true
+        id: diff
+
+      - name: Show Spring log on failure
+        if: failure() || steps.diff.outcome == 'failure'
+        run: cat apps/api-spring/spring.log || true
+
+      - name: Stop Spring
+        if: always()
+        run: |
+          if [ -f apps/api-spring/spring.pid ]; then
+            kill "$(cat apps/api-spring/spring.pid)" || true
+          fi
+
+      - name: Upload Spring log on failure
+        if: failure()
+        uses: actions/upload-artifact@v4
+        with:
+          name: spring-openapi-diff-log
+          path: apps/api-spring/spring.log
+          if-no-files-found: ignore
+          retention-days: 7

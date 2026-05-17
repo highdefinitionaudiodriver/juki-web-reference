@@ -1,0 +1,19 @@
+# CI 用プロファイル（OpenAPI diff など、認可不要のスモークでのみ使用）
+#
+# 本プロファイルでは JWT 検証を無効化します。すべてのリクエストを permitAll に
+# するため、認可済 API のセキュリティ動作は確認できません。あくまで
+# `/v3/api-docs` `/actuator/health` の取得目的に限定して使ってください。
+#
+# 起動例:
+#   java -jar target/*.jar --spring.profiles.active=ci
+
+spring:
+  autoconfigure:
+    exclude:
+      - org.springframework.boot.autoconfigure.security.oauth2.resource.servlet.OAuth2ResourceServerAutoConfiguration
+      - org.springframework.boot.autoconfigure.security.oauth2.resource.reactive.ReactiveOAuth2ResourceServerAutoConfiguration
+  security:
+    oauth2:
+      resourceserver:
+        jwt:
+          issuer-uri:
