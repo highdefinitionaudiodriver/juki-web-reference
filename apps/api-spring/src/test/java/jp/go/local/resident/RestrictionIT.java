@@ -45,7 +45,8 @@ class RestrictionIT {
 
     @Test
     void createRestriction_setsResidentRestrictedFlag() throws Exception {
-        String residentId = "R-REST-CREATE-" + System.currentTimeMillis();
+        // household_id varchar(20)。短く抑える
+        String residentId = "R-RC-" + (System.currentTimeMillis() % 1_000_000L);
         seedResident(residentId);
 
         MvcResult res = mvc.perform(post("/api/v1/restrictions")
@@ -70,7 +71,8 @@ class RestrictionIT {
 
     @Test
     void releaseRestriction_clearsResidentRestrictedFlagWhenNoActiveRestrictionsRemain() throws Exception {
-        String residentId = "R-REST-REL-" + System.currentTimeMillis();
+        // household_id varchar(20)。短く抑える
+        String residentId = "R-RR-" + (System.currentTimeMillis() % 1_000_000L);
         seedResident(residentId);
 
         MvcResult create = mvc.perform(post("/api/v1/restrictions")

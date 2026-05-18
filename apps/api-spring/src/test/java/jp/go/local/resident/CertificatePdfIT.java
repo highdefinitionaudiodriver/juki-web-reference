@@ -69,7 +69,9 @@ class CertificatePdfIT {
                 .with(jwt().jwt(j -> j.subject(userId)).authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
             .andReturn();
         assertThat(pdfRes.getResponse().getStatus()).isEqualTo(200);
-        assertThat(pdfRes.getResponse().getContentType()).isEqualTo("application/pdf");
+        // Spring が charset を付ける環境 (application/pdf;charset=UTF-8) もあるため、
+        // 主タイプ application/pdf を含むことを確認
+        assertThat(pdfRes.getResponse().getContentType()).startsWith("application/pdf");
         byte[] pdf = pdfRes.getResponse().getContentAsByteArray();
         assertThat(pdf.length).isGreaterThan(1000);
         assertThat(new String(pdf, 0, 8, java.nio.charset.StandardCharsets.US_ASCII)).startsWith("%PDF-");

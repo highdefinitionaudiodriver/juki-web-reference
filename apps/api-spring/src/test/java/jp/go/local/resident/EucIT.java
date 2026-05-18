@@ -107,8 +107,10 @@ class EucIT {
 
     @Test
     void downloadDoneRequest_returnsZipCsvFromResidentRows() throws Exception {
-        String userId = "euc-user-download-" + System.currentTimeMillis();
-        String residentId = "R-EUC-" + System.currentTimeMillis();
+        // household_id / resident_id は varchar(20)。短く抑える
+        String suffix = String.valueOf(System.currentTimeMillis() % 1_000_000L);
+        String userId = "euc-user-download-" + suffix;
+        String residentId = "R-EUC-" + suffix;
         seedUser(userId);
         seedResident(residentId);
 
@@ -127,7 +129,7 @@ class EucIT {
             .andReturn();
 
         assertThat(zipRes.getResponse().getStatus()).isEqualTo(200);
-        assertThat(zipRes.getResponse().getContentType()).isEqualTo("application/zip");
+        assertThat(zipRes.getResponse().getContentType()).startsWith("application/zip");
 
         // パスワードヘッダを取得し、AES-256 暗号化 ZIP を復号する
         String password = zipRes.getResponse().getHeader("X-Euc-Password");
