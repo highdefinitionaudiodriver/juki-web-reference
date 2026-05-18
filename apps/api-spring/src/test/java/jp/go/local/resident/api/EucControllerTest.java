@@ -214,6 +214,22 @@ class EucControllerTest {
             eq("/api/v1/euc/EUC-43/result.zip"),
             org.mockito.ArgumentMatchers.contains("\"action\":\"APPROVE\""),
             eq(43L));
+        org.mockito.Mockito.verify(jdbc).update(
+            org.mockito.ArgumentMatchers.contains("insert into report_approval"),
+            eq(43L),
+            eq(1),
+            eq("REPORT_APPROVER"),
+            eq("approver"),
+            eq("APPROVE"),
+            eq("承認します"),
+            any());
+        org.mockito.Mockito.verify(jdbc).update(
+            org.mockito.ArgumentMatchers.contains("insert into report_event"),
+            eq(43L),
+            eq("EUC_APPROVE"),
+            eq("approver"),
+            org.mockito.ArgumentMatchers.contains("\"status\":\"DONE\""),
+            any());
     }
 
     @Test
@@ -247,6 +263,25 @@ class EucControllerTest {
 
         mvc.perform(post("/api/v1/euc/EUC-42/approve")
                 .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN"))))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"action":"APPROVE"}
+                    """))
+            .andExpect(status().isConflict());
+    }
+
+    @Test
+    void approve_sameRequester_returns409() throws Exception {
+        when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(43L)))
+            .thenReturn(Map.of(
+                "status", "QUEUED",
+                "requester_user_id", "same-user",
+                "params", "{\"outputFields\":[\"residentId\",\"myNumber\"],\"includeMyNumber\":true}"
+            ));
+
+        mvc.perform(post("/api/v1/euc/EUC-43/approve")
+                .with(jwt().jwt(j -> j.subject("same-user").claim("roles", List.of("ADMIN"))))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""

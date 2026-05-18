@@ -44,7 +44,8 @@
                                                      │
                                           ┌──────────▼───────────┐
                                           │  PostgreSQL 16       │
-                                          │  22 テーブル (SCD-2) │
+                                          │  22 設計テーブル     │
+                                          │  + 2 承認/イベント   │
                                           └──────────────────────┘
 
 連携 (TODO): 住基ネットCS / 番号連携 / 戸籍 / 税 / 国保 / 選挙 / 申請管理 / マイナポータル
@@ -56,14 +57,14 @@
 |---|---|
 | API endpoint (40 設計) | Node / Spring とも主要業務 API を実装、戸籍・コード・在留・連携を拡張中 |
 | 画面 (13 設計) | 8 view に集約実装（住民検索／住民票／異動／職権異動／証明発行／抑止／統計・EUC／権限・監査） |
-| DB テーブル (22 設計) | DDL は Flyway で全 22 適用、JDBC で主要 8 テーブル運用中 |
+| DB テーブル (22 設計) | DDL は Flyway で全 22 + EUC 承認/イベント 2 テーブル適用、JDBC で主要 10 テーブル運用中 |
 | 帳票 (19+ 設計) | 0010001 / 0010007 を OpenHTMLtoPDF で生成、その他は ID 単位で出し分け対応 |
 | 認証 | OIDC リソースサーバ + Keycloak dev IdP + Web PKCE、WebAuthn は足場 |
 | 抑止／項目別マスク | 設計仕様準拠で実装（WINDOW から DV 対象は 404、個人番号は要権限） |
 | 連携 (9 系統) | 戸籍連動は異動反映、CS/番号/税/国保/選挙は業務別ペイロード対応 |
 | E2E / CI | Playwright API 13 件 PASS、a11y 7 画面、Spring OIDC E2E / OpenAPI diff / PDF/A veraPDF を含む CI 全 5 ジョブ PASS |
-| Spring テスト | MockMvc + Testcontainers IT 101 件（Docker なし環境では IT 19 件 skip） |
-| Web テスト | Vitest + React Testing Library 42 件 PASS |
+| Spring テスト | MockMvc + Testcontainers IT 103 件（Docker なし環境では IT 20 件 skip） |
+| Web テスト | Vitest + React Testing Library 45 件 PASS |
 
 詳細は [`docs/gap_matrix.md`](docs/gap_matrix.md) を参照。
 
@@ -71,16 +72,16 @@
 
 | レイヤ | テストランナ | 件数 | 内訳 |
 |---|---|---:|---|
-| Spring API Controller | MockMvc | 75 | Auth(3) / Resident(8) / ResidentSupplement(5) / Transaction(13) / Certificate(8) / Restriction(6) / Report(4) / Link(7) / Admin(7) / Audit(2) / EUC(12) |
+| Spring API Controller | MockMvc | 76 | Auth(3) / Resident(8) / ResidentSupplement(5) / Transaction(13) / Certificate(8) / Restriction(6) / Report(4) / Link(7) / Admin(7) / Audit(2) / EUC(13) |
 | Spring Service / Authz | JUnit | 7 | MaskService(5) / CertificatePdfService(1) / SecurityConfig(1) |
-| Spring Integration | Testcontainers + Spring Boot | 19 | ResidentApiIT(2) / HouseholdSplitMergeIT(2) / KosekiIT(5) / AdminIT(4) / RestrictionIT(2) / EucIT(3) / CertificatePdfIT(1) — Linux runner + Docker で実行、ローカル Docker なしは skip |
-| Web React コンポーネント | Vitest + RTL | 42 | App(15) / View 7 ファイル(27) |
+| Spring Integration | Testcontainers + Spring Boot | 20 | ResidentApiIT(2) / HouseholdSplitMergeIT(2) / KosekiIT(5) / AdminIT(4) / RestrictionIT(2) / EucIT(4) / CertificatePdfIT(1) — Linux runner + Docker で実行、ローカル Docker なしは skip |
+| Web React コンポーネント | Vitest + RTL | 45 | App(15) / View 7 ファイル(30) |
 | Node API ロジック | Node スモーク | 1 | seed の住民検索結果でロール別マスク確認 |
 | Node API E2E | Playwright | 13 | golden path（転入→住民票→転出→取消）/ 抑止隠蔽 / 戸籍連動 / 連携 |
 | Web ブラウザ a11y | Playwright + axe-core | 7 | 住民検索 / 住民票 / 証明発行 / 抑止設定 / 異動 / 統計-EUC / 権限-監査 |
 | 仕様 ⇔ 実装 ドリフト | OpenAPI diff (CI) | 1 | drift=0 維持 |
 
-**合計 165 ケースを CI で自動検証**。Linux runner + Docker 環境では IT も含めて全件 PASS。
+**合計 169 ケースを CI で自動検証**。Linux runner + Docker 環境では IT も含めて全件 PASS。
 
 ## クイックスタート
 
@@ -168,7 +169,7 @@ CI の `openapi-diff` ジョブでは Spring を `ci` プロファイルで起�
 | [`c_openapi.yaml`](c_openapi.yaml) | OpenAPI 3.1（40 path / 29 schema / 10 tag） |
 | [`a_wireframes.html`](a_wireframes.html) | ブラウザで開くワイヤーフレーム |
 | [`b_er_diagram.html`](b_er_diagram.html) | Mermaid ER 図 |
-| [`apps/api-spring/src/main/resources/db/migration/`](apps/api-spring/src/main/resources/db/migration/) | Flyway マイグレーション（22 テーブル + シード） |
+| [`apps/api-spring/src/main/resources/db/migration/`](apps/api-spring/src/main/resources/db/migration/) | Flyway マイグレーション（22 設計テーブル + EUC 承認/イベント 2 テーブル + シード） |
 
 ## 設計のキー
 

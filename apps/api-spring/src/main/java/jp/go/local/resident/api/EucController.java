@@ -128,7 +128,7 @@ public class EucController {
         Map<String, Object> job;
         try {
             job = jdbc.queryForMap("""
-                select status, params
+                select status, params, requester_user_id
                   from report_request
                  where request_id = ? and template_id = 'euc-query'
                 """, requestId);
@@ -195,12 +195,17 @@ public class EucController {
 
         Map<String, Object> params = params(job.get("params"));
         validateFilters(filters(params));
+        String approverUserId = requester(authentication);
+        String requesterUserId = String.valueOf(job.get("requester_user_id"));
+        if (approverUserId.equals(requesterUserId)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "EUC self approval is not allowed");
+        }
         String resultUrl = "APPROVE".equals(action) ? "/api/v1/euc/" + jobId + "/result.zip" : null;
         String nextStatus = "APPROVE".equals(action) ? "DONE" : "FAILED";
         String error = "APPROVE".equals(action) ? null : "Rejected by approver";
         Map<String, Object> approval = new LinkedHashMap<>();
         approval.put("action", action);
-        approval.put("approverUserId", requester(authentication));
+        approval.put("approverUserId", approverUserId);
         approval.put("comment", string(approvalBody.get("comment"), null));
         approval.put("actedAt", OffsetDateTime.now().toString());
 
@@ -211,6 +216,22 @@ public class EucController {
                    params = jsonb_set(params, '{approval}', cast(? as jsonb), true)
              where request_id = ?
             """, nextStatus, resultUrl, json(approval), requestId);
+        Integer nextStep = jdbc.queryForObject(
+            "select coalesce(max(step), 0) + 1 from report_approval where request_id = ?",
+            Integer.class, requestId);
+        jdbc.update("""
+            insert into report_approval (request_id, step, role, approver_user_id, action, comment, acted_at)
+            values (?, ?, ?, ?, ?, ?, ?)
+            """, requestId, nextStep == null ? 1 : nextStep, "REPORT_APPROVER", approverUserId, action,
+            string(approvalBody.get("comment"), null), OffsetDateTime.now());
+        Map<String, Object> event = new LinkedHashMap<>();
+        event.put("status", nextStatus);
+        event.put("resultUrl", resultUrl);
+        event.put("comment", string(approvalBody.get("comment"), null));
+        jdbc.update("""
+            insert into report_event (request_id, event_type, actor_user_id, details, occurred_at)
+            values (?, ?, ?, cast(? as jsonb), ?)
+            """, requestId, "EUC_" + action, approverUserId, json(event), OffsetDateTime.now());
 
         Map<String, Object> response = new LinkedHashMap<>();
         response.put("jobId", jobId);

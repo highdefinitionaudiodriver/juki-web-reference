@@ -10,7 +10,7 @@
 | 観点 | 設計 | 実装 | 充足率 |
 | --- | ---: | ---: | ---: |
 | API endpoint | 40 | 25+ | **62%+** |
-| DB テーブル | 22 | 22 (DDL) + 主要 8 が runtime 使用中 | **100% / 36%** |
+| DB テーブル | 22 | 22 (DDL) + EUC 承認/イベント 2 + 主要 10 が runtime 使用中 | **100% / 45%** |
 | 画面 (SCR-ID) | 13 | 8 view（住民検索／住民票／異動／職権異動／証明発行／**抑止設定**／統計・EUC／権限・監査） | **62%** |
 | 機能 (F-ID) | 約38 | 約15 | **39%** |
 | 帳票 (00100xx) | 19 + 年報 | 0010001 / 0010007 (HTML→PDF), 0010002–5 は form_id 出し分け | **30%** |
@@ -109,8 +109,8 @@
 
 | 種別 | 現状 |
 | --- | --- |
-| Spring | 101 件（MockMvc/Unit 82 PASS + Testcontainers IT 19 SKIP: Docker なし環境） |
-| Vitest | 42 件 PASS（App / Search / Resident / Restriction / Certificate / Official / Move / Reports） |
+| Spring | 103 件（MockMvc/Unit 83 PASS + Testcontainers IT 20 SKIP: Docker なし環境） |
+| Vitest | 45 件 PASS（App / Search / Resident / Restriction / Certificate / Official / Move / Reports） |
 | Playwright API | 13 件 PASS |
 | Playwright a11y | 7 画面（住民検索／住民票／証明発行／抑止設定／異動／統計EUC／権限監査） |
 | CI | Web + Node API / Spring Boot + Testcontainers / Spring OIDC E2E / OpenAPI diff / PDF/A veraPDF の全 5 ジョブ PASS |

@@ -106,6 +106,52 @@ class EucIT {
     }
 
     @Test
+    void approveQueuedRequest_persistsApprovalAndEvent() throws Exception {
+        String suffix = String.valueOf(System.currentTimeMillis() % 1_000_000L);
+        String requesterId = "euc-req-" + suffix;
+        String approverId = "euc-apr-" + suffix;
+        seedUser(requesterId);
+        seedUser(approverId);
+
+        MvcResult queued = mvc.perform(post("/api/v1/euc/query")
+                .with(jwt().jwt(j -> j.subject(requesterId)).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"outputFields":["residentId","myNumber"],"includeMyNumber":true}
+                    """))
+            .andReturn();
+        JsonNode body = objectMapper.readTree(queued.getResponse().getContentAsString());
+        long requestId = requestId(body);
+
+        MvcResult approved = mvc.perform(post("/api/v1/euc/{jobId}/approve", body.get("jobId").asText())
+                .with(jwt().jwt(j -> j.subject(approverId)).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"action":"APPROVE","comment":"IT承認"}
+                    """))
+            .andReturn();
+
+        assertThat(approved.getResponse().getStatus()).isEqualTo(200);
+        JsonNode approvedBody = objectMapper.readTree(approved.getResponse().getContentAsString());
+        assertThat(approvedBody.get("status").asText()).isEqualTo("DONE");
+        assertThat(approvedBody.get("resultUrl").asText()).isEqualTo("/api/v1/euc/EUC-" + requestId + "/result.zip");
+        assertThat(jdbc.queryForObject(
+            "select status from report_request where request_id = ?", String.class, requestId))
+            .isEqualTo("DONE");
+        assertThat(jdbc.queryForObject(
+            "select approver_user_id from report_approval where request_id = ?", String.class, requestId))
+            .isEqualTo(approverId);
+        assertThat(jdbc.queryForObject(
+            "select action from report_approval where request_id = ?", String.class, requestId))
+            .isEqualTo("APPROVE");
+        assertThat(jdbc.queryForObject(
+            "select event_type from report_event where request_id = ?", String.class, requestId))
+            .isEqualTo("EUC_APPROVE");
+    }
+
+    @Test
     void downloadDoneRequest_returnsZipCsvFromResidentRows() throws Exception {
         // household_id / resident_id は varchar(20)。短く抑える
         String suffix = String.valueOf(System.currentTimeMillis() % 1_000_000L);

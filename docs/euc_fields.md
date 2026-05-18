@@ -54,6 +54,17 @@ DV 等支援措置対象の存在隠蔽を壊さないため、この固定条�
 ## 残課題
 
 - 標準仕様書の項目 ID と `outputFields` の正式対応表作成
-- 個人番号を含む EUC の二段階承認後生成フロー
+- 個人番号を含む EUC の二段階承認後生成フローの統制強化
 - パスワード通知の別経路化
-- `report_request.result_url` ではなく専用 audit/event への password hash 記録
+- ZIP password hash 記録先の専用 audit/event 化
+
+## 承認・イベント記録
+
+個人番号を含む EUC は `QUEUED` で受け付け、`POST /api/v1/euc/{jobId}/approve` で承認または却下する。
+
+| テーブル | 用途 |
+| --- | --- |
+| `report_approval` | 承認 step / approver / action / comment / acted_at を記録 |
+| `report_event` | `EUC_APPROVE` / `EUC_REJECT` などのイベント details を JSONB で記録 |
+
+同一ユーザによる自己承認は 409 で拒否する。多段承認、承認ロール制約、専用 WORM 監査は今後の拡張対象。
