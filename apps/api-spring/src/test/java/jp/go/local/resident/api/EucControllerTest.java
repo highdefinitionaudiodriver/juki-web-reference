@@ -188,6 +188,74 @@ class EucControllerTest {
     }
 
     @Test
+    void approve_queuedJob_returnsDoneAndResultUrl() throws Exception {
+        when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(43L)))
+            .thenReturn(Map.of(
+                "status", "QUEUED",
+                "params", "{\"outputFields\":[\"residentId\",\"myNumber\"],\"includeMyNumber\":true}"
+            ));
+
+        mvc.perform(post("/api/v1/euc/EUC-43/approve")
+                .with(jwt().jwt(j -> j.subject("approver").claim("roles", List.of("ADMIN"))))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"action":"APPROVE","comment":"承認します"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.jobId").value("EUC-43"))
+            .andExpect(jsonPath("$.status").value("DONE"))
+            .andExpect(jsonPath("$.resultUrl").value("/api/v1/euc/EUC-43/result.zip"))
+            .andExpect(jsonPath("$.requiresSecondApproval").value(false));
+
+        org.mockito.Mockito.verify(jdbc).update(
+            org.mockito.ArgumentMatchers.contains("jsonb_set"),
+            eq("DONE"),
+            eq("/api/v1/euc/EUC-43/result.zip"),
+            org.mockito.ArgumentMatchers.contains("\"action\":\"APPROVE\""),
+            eq(43L));
+    }
+
+    @Test
+    void approve_rejectsQueuedJobAsFailed() throws Exception {
+        when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(43L)))
+            .thenReturn(Map.of(
+                "status", "QUEUED",
+                "params", "{\"outputFields\":[\"residentId\",\"myNumber\"],\"includeMyNumber\":true}"
+            ));
+
+        mvc.perform(post("/api/v1/euc/EUC-43/approve")
+                .with(jwt().jwt(j -> j.subject("approver").claim("roles", List.of("ADMIN"))))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"action":"REJECT","comment":"目的外利用"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("FAILED"))
+            .andExpect(jsonPath("$.resultUrl").doesNotExist())
+            .andExpect(jsonPath("$.error").value("Rejected by approver"));
+    }
+
+    @Test
+    void approve_doneJob_returns409() throws Exception {
+        when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(42L)))
+            .thenReturn(Map.of(
+                "status", "DONE",
+                "params", "{\"outputFields\":[\"residentId\"]}"
+            ));
+
+        mvc.perform(post("/api/v1/euc/EUC-42/approve")
+                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN"))))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"action":"APPROVE"}
+                    """))
+            .andExpect(status().isConflict());
+    }
+
+    @Test
     void download_withFilters_buildsWhitelistedWhereClause() throws Exception {
         when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(44L)))
             .thenReturn(Map.of(

@@ -1379,6 +1379,79 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/euc/{jobId}/approve": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /**
+         * EUC 二段階承認
+         * @description 個人番号を含む QUEUED ジョブを承認して DONE に進める、または却下して FAILED にする。承認メタデータは `report_request.params.approval` に保存する。
+         */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    jobId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: {
+                content: {
+                    "application/json": {
+                        /**
+                         * @default APPROVE
+                         * @enum {string}
+                         */
+                        action?: "APPROVE" | "REJECT";
+                        comment?: string | null;
+                    };
+                };
+            };
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AsyncJob"];
+                    };
+                };
+                /** @description action または保存済み filters が不正 */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description ジョブなし */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 承認待ちではない */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/link/cs/inbound": {
         parameters: {
             query?: never;

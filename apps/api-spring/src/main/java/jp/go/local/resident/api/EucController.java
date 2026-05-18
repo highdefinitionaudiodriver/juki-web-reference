@@ -167,6 +167,61 @@ public class EucController {
             .body(zip);
     }
 
+    @PostMapping("/{jobId}/approve")
+    public ResponseEntity<Map<String, Object>> approve(@PathVariable String jobId,
+                                                       @RequestBody(required = false) Map<String, Object> body,
+                                                       Authentication authentication) {
+        long requestId = requestId(jobId);
+        Map<String, Object> approvalBody = body == null ? Map.of() : body;
+        String action = string(approvalBody.get("action"), "APPROVE").toUpperCase();
+        if (!Set.of("APPROVE", "REJECT").contains(action)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "EUC approval action must be APPROVE or REJECT");
+        }
+
+        Map<String, Object> job;
+        try {
+            job = jdbc.queryForMap("""
+                select status, params
+                  from report_request
+                 where request_id = ? and template_id = 'euc-query'
+                """, requestId);
+        } catch (EmptyResultDataAccessException e) {
+            throw new ResponseStatusException(HttpStatus.NOT_FOUND, "EUC job not found", e);
+        }
+        String status = String.valueOf(job.get("status"));
+        if (!"QUEUED".equals(status)) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "EUC job is not awaiting approval");
+        }
+
+        Map<String, Object> params = params(job.get("params"));
+        validateFilters(filters(params));
+        String resultUrl = "APPROVE".equals(action) ? "/api/v1/euc/" + jobId + "/result.zip" : null;
+        String nextStatus = "APPROVE".equals(action) ? "DONE" : "FAILED";
+        String error = "APPROVE".equals(action) ? null : "Rejected by approver";
+        Map<String, Object> approval = new LinkedHashMap<>();
+        approval.put("action", action);
+        approval.put("approverUserId", requester(authentication));
+        approval.put("comment", string(approvalBody.get("comment"), null));
+        approval.put("actedAt", OffsetDateTime.now().toString());
+
+        jdbc.update("""
+            update report_request
+               set status = ?,
+                   result_url = ?,
+                   params = jsonb_set(params, '{approval}', cast(? as jsonb), true)
+             where request_id = ?
+            """, nextStatus, resultUrl, json(approval), requestId);
+
+        Map<String, Object> response = new LinkedHashMap<>();
+        response.put("jobId", jobId);
+        response.put("status", nextStatus);
+        response.put("progress", 100);
+        response.put("resultUrl", resultUrl);
+        response.put("error", error);
+        response.put("requiresSecondApproval", false);
+        return ResponseEntity.ok(response);
+    }
+
     @SuppressWarnings("unchecked")
     private List<String> outputFields(Map<String, Object> body) {
         Object fields = body.get("outputFields");
@@ -175,6 +230,14 @@ public class EucController {
 
     private String requester(Authentication authentication) {
         return authentication == null ? "system" : authentication.getName();
+    }
+
+    private String string(Object value, String fallback) {
+        if (value == null) {
+            return fallback;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? fallback : text;
     }
 
     private String json(Map<String, Object> body) {

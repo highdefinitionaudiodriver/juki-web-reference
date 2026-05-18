@@ -327,6 +327,26 @@ paths:
               schema: { type: string, format: binary }
         '404': { description: ジョブなし }
         '409': { description: 二段階承認待ちまたは未完了 }
+  /euc/{jobId}/approve:
+    post:
+      tags: [euc]
+      summary: EUC 二段階承認
+      description: 個人番号を含む QUEUED ジョブを承認して DONE に進める、または却下して FAILED にする。承認メタデータは `report_request.params.approval` に保存する。
+      parameters: [ { name: jobId, in: path, required: true, schema: { type: string, pattern: '^EUC-[0-9]+$' } } ]
+      requestBody:
+        required: false
+        content:
+          application/json:
+            schema:
+              type: object
+              properties:
+                action: { type: string, enum: [APPROVE, REJECT], default: APPROVE }
+                comment: { type: string, nullable: true }
+      responses:
+        '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AsyncJob' } } } }
+        '400': { description: action または保存済み filters が不正 }
+        '404': { description: ジョブなし }
+        '409': { description: 承認待ちではない }
 
   # ===== 連携 =====
   /link/cs/inbound:
