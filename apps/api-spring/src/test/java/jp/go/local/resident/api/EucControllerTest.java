@@ -28,6 +28,7 @@ import org.springframework.boot.test.context.TestConfiguration;
 import org.springframework.context.annotation.Bean;
 import org.springframework.http.MediaType;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.core.authority.SimpleGrantedAuthority;
 import org.springframework.test.web.servlet.MockMvc;
 
 /**
@@ -39,7 +40,7 @@ import org.springframework.test.web.servlet.MockMvc;
  *  - それ以外は DONE 状態
  */
 @WebMvcTest(controllers = EucController.class)
-@org.springframework.context.annotation.Import(EucControllerTest.MockBeans.class)
+@org.springframework.context.annotation.Import({EucControllerTest.MockBeans.class, EucControllerTest.MethodSecurityConfig.class})
 class EucControllerTest {
 
     @Autowired MockMvc mvc;
@@ -67,7 +68,7 @@ class EucControllerTest {
                 org.mockito.ArgumentMatchers.eq("QUEUED")))
             .thenReturn(List.of(row));
         mvc.perform(get("/api/v1/euc?status=QUEUED")
-                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN")))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].jobId").value("EUC-7"))
             .andExpect(jsonPath("$[0].status").value("QUEUED"))
@@ -90,11 +91,18 @@ class EucControllerTest {
                 )
             ));
         mvc.perform(get("/api/v1/euc")
-                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN")))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
             .andExpect(status().isOk())
             .andExpect(jsonPath("$[0].jobId").value("EUC-8"))
             .andExpect(jsonPath("$[0].status").value("DONE"))
             .andExpect(jsonPath("$[0].includeMyNumber").value(false));
+    }
+
+    @Test
+    void list_withWindowRole_returns403() throws Exception {
+        mvc.perform(get("/api/v1/euc?status=QUEUED")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_WINDOW"))))
+            .andExpect(status().isForbidden());
     }
 
     @Test
@@ -241,7 +249,8 @@ class EucControllerTest {
             ));
 
         mvc.perform(post("/api/v1/euc/EUC-43/approve")
-                .with(jwt().jwt(j -> j.subject("approver").claim("roles", List.of("ADMIN"))))
+                .with(jwt().jwt(j -> j.subject("approver"))
+                    .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -286,7 +295,8 @@ class EucControllerTest {
             ));
 
         mvc.perform(post("/api/v1/euc/EUC-43/approve")
-                .with(jwt().jwt(j -> j.subject("approver").claim("roles", List.of("ADMIN"))))
+                .with(jwt().jwt(j -> j.subject("approver"))
+                    .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -307,7 +317,7 @@ class EucControllerTest {
             ));
 
         mvc.perform(post("/api/v1/euc/EUC-42/approve")
-                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN"))))
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
@@ -326,13 +336,26 @@ class EucControllerTest {
             ));
 
         mvc.perform(post("/api/v1/euc/EUC-43/approve")
-                .with(jwt().jwt(j -> j.subject("same-user").claim("roles", List.of("ADMIN"))))
+                .with(jwt().jwt(j -> j.subject("same-user"))
+                    .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
                     {"action":"APPROVE"}
                     """))
             .andExpect(status().isConflict());
+    }
+
+    @Test
+    void approve_withWindowRole_returns403() throws Exception {
+        mvc.perform(post("/api/v1/euc/EUC-43/approve")
+                .with(jwt().authorities(new SimpleGrantedAuthority("ROLE_WINDOW")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"action":"APPROVE"}
+                    """))
+            .andExpect(status().isForbidden());
     }
 
     @Test
@@ -387,5 +410,10 @@ class EucControllerTest {
     @TestConfiguration
     static class MockBeans {
         @Bean JdbcTemplate jdbcTemplate() { return mock(JdbcTemplate.class); }
+    }
+
+    @TestConfiguration
+    @org.springframework.security.config.annotation.method.configuration.EnableMethodSecurity
+    static class MethodSecurityConfig {
     }
 }

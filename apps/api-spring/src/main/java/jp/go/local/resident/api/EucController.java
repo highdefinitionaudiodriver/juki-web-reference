@@ -33,6 +33,7 @@ import org.springframework.http.MediaType;
 import org.springframework.http.ResponseEntity;
 import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
+import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
@@ -95,6 +96,7 @@ public class EucController {
      *   includeMyNumber / resultUrl
      */
     @GetMapping
+    @PreAuthorize("hasRole('ADMIN')")
     public java.util.List<Map<String, Object>> list(
             @org.springframework.web.bind.annotation.RequestParam(name = "status", required = false) String status) {
         java.util.List<Map<String, Object>> rows;
@@ -227,6 +229,7 @@ public class EucController {
     }
 
     @PostMapping("/{jobId}/approve")
+    @PreAuthorize("hasRole('ADMIN')")
     public ResponseEntity<Map<String, Object>> approve(@PathVariable String jobId,
                                                        @RequestBody(required = false) Map<String, Object> body,
                                                        Authentication authentication) {
@@ -240,7 +243,7 @@ public class EucController {
         Map<String, Object> job;
         try {
             job = jdbc.queryForMap("""
-                select status, params
+                select status, params, requester_user_id
                   from report_request
                  where request_id = ? and template_id = 'euc-query'
                 """, requestId);
