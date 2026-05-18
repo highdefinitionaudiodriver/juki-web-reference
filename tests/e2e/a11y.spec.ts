@@ -60,7 +60,8 @@ test("a11y: 抑止設定画面 (SCR-301)", async ({ page }) => {
   await page.waitForSelector("tbody tr");
   await page.locator("tbody tr").first().click();
   await page.getByRole("button", { name: "抑止設定" }).click();
-  await page.waitForSelector("h2");
+  // 抑止画面固有の見出しを待つ（generic な h2 だと別画面遷移中に誤マッチする可能性）
+  await page.getByRole("heading", { name: /抑止登録/ }).waitFor();
   const results = await new AxeBuilder({ page }).withTags(SCOPE_TAGS).analyze();
   expect(results.violations, prettyViolations(results.violations)).toEqual([]);
 });

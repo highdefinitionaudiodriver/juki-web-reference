@@ -1,4 +1,6 @@
-:root{--bg:#f5f7fb;--ink:#17212b;--muted:#607082;--line:#d6dde6;--panel:#fff;--nav:#124559;--nav2:#0b3142;--accent:#087f8c;--danger:#b23a48;--warn:#b7791f;--ok:#2f7d4f;--blue:#4267ac}
+/* --warn は .badge.warn 等の小文字テキスト (12px) で #fff4df 上に使うため、
+   WCAG AA (4.5:1) を満たす暗色 (#8a5d00 / 5.7:1) を採用。 */
+:root{--bg:#f5f7fb;--ink:#17212b;--muted:#607082;--line:#d6dde6;--panel:#fff;--nav:#124559;--nav2:#0b3142;--accent:#087f8c;--danger:#b23a48;--warn:#8a5d00;--ok:#2f7d4f;--blue:#4267ac}
 *{box-sizing:border-box}
 html,body,#app{min-height:100%}
 body{margin:0;background:var(--bg);color:var(--ink);font:14px/1.55 "Yu Gothic UI",Meiryo,system-ui,sans-serif}
