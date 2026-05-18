@@ -1,4 +1,14 @@
-export const me = { userId: "u-window-001", fullName: "山田 太郎", department: "住民課 窓口係", roles: ["RESIDENT_READ", "CERTIFICATE_ISSUE", "RESTRICTION_VIEW"] };
+// 開発 dev サーバの既定ユーザ。
+// roles は apps/api/src/authz.js の ROLES 定義 (WINDOW / REVIEW / RESTRICTION_RELEASE / ADMIN)
+// と一致させる必要がある。一致しないと canAction(...) が false を返し、検索すら 403 になる。
+// dev では「窓口担当 + 証明発行担当」相当の WINDOW を既定とし、テスト用に X-Dev-Roles で
+// 別ロールを差し込めるようにしている。
+export const me = {
+  userId: "u-window-001",
+  fullName: "山田 太郎",
+  department: "住民課 窓口係",
+  roles: ["WINDOW"],
+};
 
 export const residents = [
   { residentId: "0000123456", householdId: "H-00045", familyNameKanji: "住民", givenNameKanji: "太郎", familyNameKana: "ジュウミン", givenNameKana: "タロウ", birthDate: "1985-04-01", sex: "M", addressCode: "132010001001", addressText: "東京都サンプル市中央町1-2-3", relationToHead: "本人", movedInDate: "2018-06-01", movedOutDate: null, juminCode: "12345678901", myNumber: "123456789018", nationality: null, foreigner: null, alias: [], restrictions: [], validFrom: "2018-06-01T00:00:00+09:00", validTo: null },

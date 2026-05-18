@@ -11,9 +11,20 @@ import { expect, test } from "@playwright/test";
  *  - 違反があった場合は Playwright report に詳細が出る
  *  - critical/serious 級のみ failing にしたい場合は include/exclude や
  *    withTags(['wcag2a','wcag2aa']) を絞る
+ *
+ * 全テストで X-Dev-Roles を ADMIN 等込みで付与する。
+ * seed の me.roles に依存せず、各画面の権限要件を確実に満たすため。
+ * （これがないと canAction("SEARCH") が false で 403 となり、tbody が空のまま
+ *   waitForSelector がタイムアウトする）
  */
 
 const SCOPE_TAGS = ["wcag2a", "wcag2aa", "wcag21a", "wcag21aa"];
+
+test.use({
+  extraHTTPHeaders: {
+    "X-Dev-Roles": "WINDOW,REVIEW,RESTRICTION_RELEASE,ADMIN",
+  },
+});
 
 test("a11y: 住民検索画面", async ({ page }) => {
   await page.goto("/");

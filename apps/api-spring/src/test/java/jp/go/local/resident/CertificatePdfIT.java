@@ -45,8 +45,11 @@ class CertificatePdfIT {
 
     @Test
     void issueCertificateAndDownloadPdf_fromRealSchema() throws Exception {
-        String userId = "cert-user-" + System.currentTimeMillis();
-        String residentId = "R-CERT-" + System.currentTimeMillis();
+        // household_id / resident_id は varchar(20)。下 6 桁を使い、長さを抑える
+        // ("H-CERT-XXXXXX" / "R-CERT-XXXXXX" で 13 文字)。
+        String suffix = String.valueOf(System.currentTimeMillis() % 1_000_000L);
+        String userId = "cert-user-" + suffix;
+        String residentId = "R-CERT-" + suffix;
         seedUser(userId);
         seedResident(residentId);
 
