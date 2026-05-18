@@ -11,12 +11,15 @@ import java.nio.charset.StandardCharsets;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
 import java.security.SecureRandom;
+import java.time.LocalDate;
 import java.time.OffsetDateTime;
+import java.time.format.DateTimeParseException;
 import java.util.ArrayList;
 import java.util.HexFormat;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 import net.lingala.zip4j.io.outputstream.ZipOutputStream;
 import net.lingala.zip4j.model.ZipParameters;
 import net.lingala.zip4j.model.enums.AesKeyStrength;
@@ -50,6 +53,21 @@ public class EucController {
         "movedInDate", "moved_in_date::text",
         "householdId", "household_id"
     );
+    private static final Set<String> FILTER_KEYS = Set.of(
+        "residentId",
+        "residentIdPrefix",
+        "householdId",
+        "sex",
+        "addressCode",
+        "addressTextContains",
+        "nameContains",
+        "nationality",
+        "birthDateFrom",
+        "birthDateTo",
+        "movedInDateFrom",
+        "movedInDateTo"
+    );
+    private static final Set<String> SEX_VALUES = Set.of("M", "F", "U");
     private static final SecureRandom RANDOM = new SecureRandom();
     /** ZIP パスワード生成に使う文字集合（紛らわしい I/l/0/O は除外）。 */
     private static final char[] PASSWORD_ALPHABET =
@@ -68,6 +86,7 @@ public class EucController {
     public ResponseEntity<Map<String, Object>> query(@RequestBody Map<String, Object> body,
                                                      Authentication authentication) {
         Map<String, Object> requestBody = body == null ? Map.of() : body;
+        validateFilters(filters(requestBody));
         boolean includeMyNumber = Boolean.TRUE.equals(requestBody.get("includeMyNumber")) || outputFields(requestBody).contains("myNumber");
         String status = includeMyNumber ? "QUEUED" : "DONE";
         Integer progress = includeMyNumber ? 10 : 100;
@@ -122,6 +141,7 @@ public class EucController {
         }
 
         Map<String, Object> params = params(job.get("params"));
+        validateFilters(filters(params));
         List<String> fields = outputFields(params).stream()
             .filter(FIELD_EXPRESSIONS::containsKey)
             .toList();
@@ -279,6 +299,43 @@ public class EucController {
             return out;
         }
         throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "EUC filters must be an object");
+    }
+
+    private void validateFilters(Map<String, Object> filters) {
+        if (filters.isEmpty()) {
+            return;
+        }
+        for (String key : filters.keySet()) {
+            if (!FILTER_KEYS.contains(key)) {
+                throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "Unsupported EUC filter: " + key);
+            }
+        }
+        String sex = stringFilter(filters, "sex");
+        if (sex != null && !SEX_VALUES.contains(sex)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "EUC filter sex must be M, F or U");
+        }
+        validateDateRange(filters, "birthDateFrom", "birthDateTo", "birthDate");
+        validateDateRange(filters, "movedInDateFrom", "movedInDateTo", "movedInDate");
+    }
+
+    private void validateDateRange(Map<String, Object> filters, String fromKey, String toKey, String label) {
+        LocalDate from = dateFilter(filters, fromKey);
+        LocalDate to = dateFilter(filters, toKey);
+        if (from != null && to != null && from.isAfter(to)) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "EUC filter " + label + " range is invalid");
+        }
+    }
+
+    private LocalDate dateFilter(Map<String, Object> filters, String key) {
+        String value = stringFilter(filters, key);
+        if (value == null) {
+            return null;
+        }
+        try {
+            return LocalDate.parse(value);
+        } catch (DateTimeParseException e) {
+            throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "EUC filter " + key + " must be yyyy-MM-dd", e);
+        }
     }
 
     private WhereClause whereClause(Map<String, Object> filters) {

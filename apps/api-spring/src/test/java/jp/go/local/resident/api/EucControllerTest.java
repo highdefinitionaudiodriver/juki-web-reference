@@ -100,6 +100,18 @@ class EucControllerTest {
     }
 
     @Test
+    void query_withUnsupportedFilter_returns400() throws Exception {
+        mvc.perform(post("/api/v1/euc/query")
+                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN"))))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"outputFields":["residentId"],"filters":{"sql":"drop table resident"}}
+                    """))
+            .andExpect(status().isBadRequest());
+    }
+
+    @Test
     void download_doneJob_returnsEncryptedZipAndPasswordHeader() throws Exception {
         when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(42L)))
             .thenReturn(Map.of(
@@ -207,6 +219,21 @@ class EucControllerTest {
             .doesNotContain("1%_");
         org.assertj.core.api.Assertions.assertThat(args.getValue())
             .containsExactly("F", "1980-01-01", "1999-12-31", "R-%", "%住民%", "%1\\%\\_%");
+    }
+
+    @Test
+    void download_withInvalidFilterValues_returns400() throws Exception {
+        when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(45L)))
+            .thenReturn(Map.of(
+                "status", "DONE",
+                "params", """
+                    {"outputFields":["residentId"],"filters":{"sex":"X","birthDateFrom":"2026-01-01","birthDateTo":"2025-01-01"}}
+                    """
+            ));
+
+        mvc.perform(get("/api/v1/euc/EUC-45/result.zip")
+                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN")))))
+            .andExpect(status().isBadRequest());
     }
 
     @TestConfiguration

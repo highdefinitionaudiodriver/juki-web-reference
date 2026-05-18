@@ -62,7 +62,7 @@
 | 抑止／項目別マスク | 設計仕様準拠で実装（WINDOW から DV 対象は 404、個人番号は要権限） |
 | 連携 (9 系統) | 戸籍連動は異動反映、CS/番号/税/国保/選挙は業務別ペイロード対応 |
 | E2E / CI | Playwright API 13 件 PASS、a11y 7 画面、Spring OIDC E2E / OpenAPI diff / PDF/A veraPDF を含む CI 全 5 ジョブ PASS |
-| Spring テスト | MockMvc + Testcontainers IT 96 件（Docker なし環境では IT 19 件 skip） |
+| Spring テスト | MockMvc + Testcontainers IT 98 件（Docker なし環境では IT 19 件 skip） |
 | Web テスト | Vitest + React Testing Library 42 件 PASS |
 
 詳細は [`docs/gap_matrix.md`](docs/gap_matrix.md) を参照。
@@ -71,7 +71,7 @@
 
 | レイヤ | テストランナ | 件数 | 内訳 |
 |---|---|---:|---|
-| Spring API Controller | MockMvc | 70 | Auth(3) / Resident(8) / ResidentSupplement(5) / Transaction(13) / Certificate(8) / Restriction(6) / Report(4) / Link(7) / Admin(7) / Audit(2) / EUC(7) |
+| Spring API Controller | MockMvc | 72 | Auth(3) / Resident(8) / ResidentSupplement(5) / Transaction(13) / Certificate(8) / Restriction(6) / Report(4) / Link(7) / Admin(7) / Audit(2) / EUC(9) |
 | Spring Service / Authz | JUnit | 7 | MaskService(5) / CertificatePdfService(1) / SecurityConfig(1) |
 | Spring Integration | Testcontainers + Spring Boot | 19 | ResidentApiIT(2) / HouseholdSplitMergeIT(2) / KosekiIT(5) / AdminIT(4) / RestrictionIT(2) / EucIT(3) / CertificatePdfIT(1) — Linux runner + Docker で実行、ローカル Docker なしは skip |
 | Web React コンポーネント | Vitest + RTL | 42 | App(15) / View 7 ファイル(27) |
@@ -80,7 +80,7 @@
 | Web ブラウザ a11y | Playwright + axe-core | 7 | 住民検索 / 住民票 / 証明発行 / 抑止設定 / 異動 / 統計-EUC / 権限-監査 |
 | 仕様 ⇔ 実装 ドリフト | OpenAPI diff (CI) | 1 | drift=0 維持 |
 
-**合計 160 ケースを CI で自動検証**。Linux runner + Docker 環境では IT も含めて全件 PASS。
+**合計 162 ケースを CI で自動検証**。Linux runner + Docker 環境では IT も含めて全件 PASS。
 
 ## クイックスタート
 
