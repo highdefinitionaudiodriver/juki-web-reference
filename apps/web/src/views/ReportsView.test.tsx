@@ -38,4 +38,53 @@ describe("ReportsView", () => {
       format: "CSV",
     });
   });
+
+  it("onEucApprove が無い場合は EUC 承認 UI が表示されない", () => {
+    render(<ReportsView onAnnualReport={vi.fn()} onEucQuery={vi.fn()} />);
+    expect(screen.queryByRole("heading", { name: "EUC 二段階承認" })).not.toBeInTheDocument();
+  });
+
+  it("EUC 承認 UI: APPROVE ボタンで onEucApprove(jobId, APPROVE, comment)", async () => {
+    const onEucApprove = vi
+      .fn()
+      .mockResolvedValue({ jobId: "EUC-42", status: "DONE", resultUrl: "/api/v1/euc/EUC-42/result.zip" });
+    render(
+      <ReportsView
+        onAnnualReport={vi.fn()}
+        onEucQuery={vi.fn()}
+        onEucApprove={onEucApprove}
+      />
+    );
+    const user = userEvent.setup();
+
+    expect(screen.getByRole("heading", { name: "EUC 二段階承認" })).toBeInTheDocument();
+    // jobId が空のときは承認ボタンは disabled
+    expect(screen.getByRole("button", { name: /承認/ })).toBeDisabled();
+    await user.type(screen.getByLabelText("EUC job ID"), "EUC-42");
+    await user.type(screen.getByLabelText("コメント (任意)"), "OK");
+    await user.click(screen.getByRole("button", { name: /承認/ }));
+
+    expect(onEucApprove).toHaveBeenCalledWith("EUC-42", "APPROVE", "OK");
+    // 結果が表示される
+    expect(await screen.findByText(/APPROVE -> DONE/)).toBeInTheDocument();
+  });
+
+  it("EUC 承認 UI: REJECT ボタンで onEucApprove(jobId, REJECT)", async () => {
+    const onEucApprove = vi
+      .fn()
+      .mockResolvedValue({ jobId: "EUC-99", status: "FAILED", error: "Rejected by approver" });
+    render(
+      <ReportsView
+        onAnnualReport={vi.fn()}
+        onEucQuery={vi.fn()}
+        onEucApprove={onEucApprove}
+      />
+    );
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("EUC job ID"), "EUC-99");
+    await user.click(screen.getByRole("button", { name: /却下/ }));
+
+    expect(onEucApprove).toHaveBeenCalledWith("EUC-99", "REJECT", undefined);
+    expect(await screen.findByText(/REJECT -> FAILED/)).toBeInTheDocument();
+  });
 });

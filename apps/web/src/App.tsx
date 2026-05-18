@@ -190,6 +190,20 @@ export function App() {
                 : `EUC結果を作成しました: ${job.resultUrl}`
             );
           }}
+          onEucApprove={async (jobId, action, comment) => {
+            try {
+              const job = await api.eucApprove(jobId, { action, comment });
+              notify(
+                job.status === "DONE"
+                  ? `EUC ${jobId} を承認しました。結果: ${job.resultUrl ?? "-"}`
+                  : `EUC ${jobId} を却下しました。状態: ${job.status}`
+              );
+              return job;
+            } catch (e) {
+              setNotice({ kind: "err", message: `EUC 承認に失敗しました: ${String(e)}` });
+              return undefined;
+            }
+          }}
         />
       )}
       {view === "restriction" && (

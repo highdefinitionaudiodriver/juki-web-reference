@@ -1,5 +1,5 @@
 import { useState } from "react";
-import type { EucQueryReq, ReportReq } from "../types";
+import type { EucAsyncJob, EucQueryReq, ReportReq } from "../types";
 import { Field } from "../components/Field";
 
 type EucOutputField = NonNullable<EucQueryReq["outputFields"]>[number];
@@ -23,6 +23,11 @@ const EUC_OUTPUT_FIELDS = new Set<EucOutputField>(EUC_OUTPUT_FIELD_OPTIONS);
 type Props = {
   onAnnualReport: (req: ReportReq) => Promise<void>;
   onEucQuery: (req: EucQueryReq) => Promise<void>;
+  /**
+   * EUC 二段階承認。jobId と APPROVE/REJECT + コメントを渡す。
+   * 標準仕様書 10.1: 個人番号を含む抽出は別経路の承認者が APPROVE してから ZIP 配信される。
+   */
+  onEucApprove?: (jobId: string, action: "APPROVE" | "REJECT", comment?: string) => Promise<EucAsyncJob | void>;
 };
 
 function parseOutputFields(value: string): EucOutputField[] {
@@ -32,11 +37,14 @@ function parseOutputFields(value: string): EucOutputField[] {
     .filter((field): field is EucOutputField => EUC_OUTPUT_FIELDS.has(field as EucOutputField));
 }
 
-export function ReportsView({ onAnnualReport, onEucQuery }: Props) {
+export function ReportsView({ onAnnualReport, onEucQuery, onEucApprove }: Props) {
   const [template, setTemplate] = useState("annual-20-6");
   const [year, setYear] = useState("2026");
   const [fields, setFields] = useState("residentId,name,addressText");
   const [withMyNumber, setWithMyNumber] = useState(false);
+  const [approveJobId, setApproveJobId] = useState("");
+  const [approveComment, setApproveComment] = useState("");
+  const [approveStatus, setApproveStatus] = useState<string | null>(null);
 
   return (
     <div className="grid two">
@@ -83,6 +91,54 @@ export function ReportsView({ onAnnualReport, onEucQuery }: Props) {
           </label>
           <button className="primary">抽出依頼</button>
         </form>
+
+        {onEucApprove && (
+          <div style={{ marginTop: 16, paddingTop: 12, borderTop: "1px solid var(--line)" }}>
+            <h3 style={{ marginBottom: 8 }}>EUC 二段階承認</h3>
+            <p className="muted" style={{ marginBottom: 8 }}>
+              個人番号を含む抽出は QUEUED 状態で承認待ちになります。jobId を入力して承認／却下してください。
+            </p>
+            <form
+              className="stack"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                e.stopPropagation();
+              }}
+            >
+              <Field label="EUC job ID" value={approveJobId} onChange={setApproveJobId} placeholder="EUC-42" />
+              <Field label="コメント (任意)" value={approveComment} onChange={setApproveComment} />
+              <div style={{ display: "flex", gap: 8, flexWrap: "wrap" }}>
+                <button
+                  type="button"
+                  className="primary"
+                  disabled={!approveJobId}
+                  onClick={async () => {
+                    const result = await onEucApprove(approveJobId, "APPROVE", approveComment || undefined);
+                    setApproveStatus(result ? `APPROVE -> ${result.status} (${result.resultUrl ?? "-"})` : "APPROVE 完了");
+                  }}
+                >
+                  承認 (APPROVE)
+                </button>
+                <button
+                  type="button"
+                  className="danger"
+                  disabled={!approveJobId}
+                  onClick={async () => {
+                    const result = await onEucApprove(approveJobId, "REJECT", approveComment || undefined);
+                    setApproveStatus(result ? `REJECT -> ${result.status} (${result.error ?? "-"})` : "REJECT 完了");
+                  }}
+                >
+                  却下 (REJECT)
+                </button>
+              </div>
+              {approveStatus && (
+                <p className="muted" style={{ marginTop: 4 }}>
+                  最終結果: <strong>{approveStatus}</strong>
+                </p>
+              )}
+            </form>
+          </div>
+        )}
       </section>
     </div>
   );
