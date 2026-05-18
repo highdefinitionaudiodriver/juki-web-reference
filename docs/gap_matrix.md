@@ -115,6 +115,8 @@
 | Playwright a11y | 7 画面（住民検索／住民票／証明発行／抑止設定／異動／統計EUC／権限監査） |
 | CI | Web + Node API / Spring Boot + Testcontainers / Spring OIDC E2E / OpenAPI diff / PDF/A veraPDF の全 5 ジョブ PASS |
 
+EUC の許可出力項目・抽出条件は [`docs/euc_fields.md`](euc_fields.md) を参照。
+
 ## 結論
 
 Codex MVP 比で **API 充足率 +25 ポイント以上、画面 +1 view、認証・履歴・PDF・帳票が大幅前進**。
