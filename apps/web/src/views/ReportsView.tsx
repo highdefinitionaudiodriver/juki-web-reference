@@ -4,7 +4,7 @@ import { Field } from "../components/Field";
 
 type EucOutputField = NonNullable<EucQueryReq["outputFields"]>[number];
 
-const EUC_OUTPUT_FIELDS = new Set<EucOutputField>([
+const EUC_OUTPUT_FIELD_OPTIONS: EucOutputField[] = [
   "residentId",
   "name",
   "nameKana",
@@ -16,7 +16,9 @@ const EUC_OUTPUT_FIELDS = new Set<EucOutputField>([
   "movedInDate",
   "householdId",
   "myNumber",
-]);
+];
+
+const EUC_OUTPUT_FIELDS = new Set<EucOutputField>(EUC_OUTPUT_FIELD_OPTIONS);
 
 type Props = {
   onAnnualReport: (req: ReportReq) => Promise<void>;
@@ -65,7 +67,12 @@ export function ReportsView({ onAnnualReport, onEucQuery }: Props) {
             });
           }}
         >
-          <Field label="出力項目（カンマ区切り）" value={fields} onChange={setFields} />
+          <Field label="出力項目（カンマ区切り）" value={fields} onChange={setFields} list="euc-output-fields" />
+          <datalist id="euc-output-fields">
+            {EUC_OUTPUT_FIELD_OPTIONS.map((field) => (
+              <option key={field} value={field} />
+            ))}
+          </datalist>
           <label className="check">
             <input
               type="checkbox"
