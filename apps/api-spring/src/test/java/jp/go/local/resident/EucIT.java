@@ -106,12 +106,14 @@ class EucIT {
     }
 
     @Test
-    void approveQueuedRequest_persistsApprovalAndEvent() throws Exception {
+    void approveQueuedRequest_persistsTwoApprovalsAndEvent() throws Exception {
         String suffix = String.valueOf(System.currentTimeMillis() % 1_000_000L);
         String requesterId = "euc-req-" + suffix;
         String approverId = "euc-apr-" + suffix;
+        String approver2Id = "euc-ap2-" + suffix;
         seedUser(requesterId);
         seedUser(approverId);
+        seedUser(approver2Id);
 
         MvcResult queued = mvc.perform(post("/api/v1/euc/query")
                 .with(jwt().jwt(j -> j.subject(requesterId)).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
@@ -124,30 +126,51 @@ class EucIT {
         JsonNode body = objectMapper.readTree(queued.getResponse().getContentAsString());
         long requestId = requestId(body);
 
-        MvcResult approved = mvc.perform(post("/api/v1/euc/{jobId}/approve", body.get("jobId").asText())
+        MvcResult firstApproved = mvc.perform(post("/api/v1/euc/{jobId}/approve", body.get("jobId").asText())
                 .with(jwt().jwt(j -> j.subject(approverId)).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
                 .with(csrf())
                 .contentType(MediaType.APPLICATION_JSON)
                 .content("""
-                    {"action":"APPROVE","comment":"IT承認"}
+                    {"action":"APPROVE","comment":"IT一次承認"}
                     """))
             .andReturn();
 
-        assertThat(approved.getResponse().getStatus()).isEqualTo(200);
-        JsonNode approvedBody = objectMapper.readTree(approved.getResponse().getContentAsString());
+        assertThat(firstApproved.getResponse().getStatus()).isEqualTo(200);
+        JsonNode firstBody = objectMapper.readTree(firstApproved.getResponse().getContentAsString());
+        assertThat(firstBody.get("status").asText()).isEqualTo("QUEUED");
+        assertThat(firstBody.get("approvedCount").asInt()).isEqualTo(1);
+        assertThat(jdbc.queryForObject(
+            "select status from report_request where request_id = ?", String.class, requestId))
+            .isEqualTo("QUEUED");
+
+        MvcResult secondApproved = mvc.perform(post("/api/v1/euc/{jobId}/approve", body.get("jobId").asText())
+                .with(jwt().jwt(j -> j.subject(approver2Id)).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"action":"APPROVE","comment":"IT二次承認"}
+                    """))
+            .andReturn();
+
+        assertThat(secondApproved.getResponse().getStatus()).isEqualTo(200);
+        JsonNode approvedBody = objectMapper.readTree(secondApproved.getResponse().getContentAsString());
         assertThat(approvedBody.get("status").asText()).isEqualTo("DONE");
+        assertThat(approvedBody.get("approvedCount").asInt()).isEqualTo(2);
         assertThat(approvedBody.get("resultUrl").asText()).isEqualTo("/api/v1/euc/EUC-" + requestId + "/result.zip");
         assertThat(jdbc.queryForObject(
             "select status from report_request where request_id = ?", String.class, requestId))
             .isEqualTo("DONE");
         assertThat(jdbc.queryForObject(
-            "select approver_user_id from report_approval where request_id = ?", String.class, requestId))
+            "select approver_user_id from report_approval where request_id = ? order by step limit 1", String.class, requestId))
             .isEqualTo(approverId);
         assertThat(jdbc.queryForObject(
-            "select action from report_approval where request_id = ?", String.class, requestId))
+            "select count(*) from report_approval where request_id = ?", Integer.class, requestId))
+            .isEqualTo(2);
+        assertThat(jdbc.queryForObject(
+            "select action from report_approval where request_id = ? order by step desc limit 1", String.class, requestId))
             .isEqualTo("APPROVE");
         assertThat(jdbc.queryForObject(
-            "select event_type from report_event where request_id = ?", String.class, requestId))
+            "select event_type from report_event where request_id = ? order by occurred_at desc limit 1", String.class, requestId))
             .isEqualTo("EUC_APPROVE");
     }
 

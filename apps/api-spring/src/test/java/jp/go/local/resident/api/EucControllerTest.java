@@ -9,6 +9,7 @@ import static org.springframework.test.web.servlet.result.MockMvcResultMatchers.
 import static org.mockito.ArgumentMatchers.any;
 import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
+import static org.mockito.ArgumentMatchers.isNull;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
 import static org.mockito.Mockito.verify;
@@ -119,7 +120,9 @@ class EucControllerTest {
             .andExpect(jsonPath("$.status").value("DONE"))
             .andExpect(jsonPath("$.progress").value(100))
             .andExpect(jsonPath("$.resultUrl").value("/api/v1/euc/EUC-42/result.zip"))
-            .andExpect(jsonPath("$.requiresSecondApproval").value(false));
+            .andExpect(jsonPath("$.requiresSecondApproval").value(false))
+            .andExpect(jsonPath("$.requiredApprovals").value(1))
+            .andExpect(jsonPath("$.approvedCount").value(0));
     }
 
     @Test
@@ -135,7 +138,9 @@ class EucControllerTest {
             .andExpect(jsonPath("$.status").value("QUEUED"))
             .andExpect(jsonPath("$.progress").value(10))
             .andExpect(jsonPath("$.resultUrl").doesNotExist())
-            .andExpect(jsonPath("$.requiresSecondApproval").value(true));
+            .andExpect(jsonPath("$.requiresSecondApproval").value(true))
+            .andExpect(jsonPath("$.requiredApprovals").value(2))
+            .andExpect(jsonPath("$.approvedCount").value(0));
     }
 
     @Test
@@ -260,7 +265,9 @@ class EucControllerTest {
             .andExpect(jsonPath("$.jobId").value("EUC-43"))
             .andExpect(jsonPath("$.status").value("DONE"))
             .andExpect(jsonPath("$.resultUrl").value("/api/v1/euc/EUC-43/result.zip"))
-            .andExpect(jsonPath("$.requiresSecondApproval").value(false));
+            .andExpect(jsonPath("$.requiresSecondApproval").value(false))
+            .andExpect(jsonPath("$.requiredApprovals").value(1))
+            .andExpect(jsonPath("$.approvedCount").value(1));
 
         org.mockito.Mockito.verify(jdbc).update(
             org.mockito.ArgumentMatchers.contains("jsonb_set"),
@@ -284,6 +291,66 @@ class EucControllerTest {
             eq("approver"),
             org.mockito.ArgumentMatchers.contains("\"status\":\"DONE\""),
             any());
+    }
+
+    @Test
+    void approve_firstApproverWhenTwoRequired_keepsQueued() throws Exception {
+        when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(43L)))
+            .thenReturn(Map.of(
+                "status", "QUEUED",
+                "requester_user_id", "requester",
+                "required_approvals", 2,
+                "params", "{\"outputFields\":[\"residentId\",\"myNumber\"],\"includeMyNumber\":true}"
+            ));
+
+        mvc.perform(post("/api/v1/euc/EUC-43/approve")
+                .with(jwt().jwt(j -> j.subject("approver-1"))
+                    .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"action":"APPROVE","comment":"一次承認"}
+                    """))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$.status").value("QUEUED"))
+            .andExpect(jsonPath("$.resultUrl").doesNotExist())
+            .andExpect(jsonPath("$.requiresSecondApproval").value(true))
+            .andExpect(jsonPath("$.requiredApprovals").value(2))
+            .andExpect(jsonPath("$.approvedCount").value(1));
+
+        org.mockito.Mockito.verify(jdbc).update(
+            org.mockito.ArgumentMatchers.contains("jsonb_set"),
+            eq("QUEUED"),
+            isNull(),
+            org.mockito.ArgumentMatchers.contains("\"requiredApprovals\":2"),
+            eq(43L));
+    }
+
+    @Test
+    void approve_duplicateApprover_returns409() throws Exception {
+        when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(43L)))
+            .thenReturn(Map.of(
+                "status", "QUEUED",
+                "requester_user_id", "requester",
+                "required_approvals", 2,
+                "params", "{\"outputFields\":[\"residentId\",\"myNumber\"],\"includeMyNumber\":true}"
+            ));
+        when(jdbc.queryForObject(
+                org.mockito.ArgumentMatchers.contains("approver_user_id"),
+                eq(Integer.class),
+                eq(43L),
+                eq("approver-1")))
+            .thenReturn(1);
+
+        mvc.perform(post("/api/v1/euc/EUC-43/approve")
+                .with(jwt().jwt(j -> j.subject("approver-1"))
+                    .authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"action":"APPROVE"}
+                    """))
+            .andExpect(status().isConflict());
     }
 
     @Test

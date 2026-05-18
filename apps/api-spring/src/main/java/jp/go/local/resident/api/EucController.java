@@ -151,13 +151,14 @@ public class EucController {
         boolean includeMyNumber = Boolean.TRUE.equals(requestBody.get("includeMyNumber")) || outputFields(requestBody).contains("myNumber");
         String status = includeMyNumber ? "QUEUED" : "DONE";
         Integer progress = includeMyNumber ? 10 : 100;
+        Integer requiredApprovals = includeMyNumber ? 2 : 1;
         String resultUrl = null;
         Map<String, Object> row = jdbc.queryForMap("""
             insert into report_request
-              (template_id, requester_user_id, status, params, requested_at, result_url)
-            values (?, ?, ?, cast(? as jsonb), ?, ?)
+              (template_id, requester_user_id, status, params, requested_at, result_url, required_approvals)
+            values (?, ?, ?, cast(? as jsonb), ?, ?, ?)
             returning request_id
-            """, "euc-query", requester(authentication), status, json(requestBody), OffsetDateTime.now(), resultUrl);
+            """, "euc-query", requester(authentication), status, json(requestBody), OffsetDateTime.now(), resultUrl, requiredApprovals);
         String jobId = "EUC-" + row.get("request_id");
         if (!includeMyNumber) {
             resultUrl = "/api/v1/euc/" + jobId + "/result.zip";
@@ -170,6 +171,8 @@ public class EucController {
         response.put("resultUrl", resultUrl);
         response.put("error", null);
         response.put("requiresSecondApproval", includeMyNumber);
+        response.put("requiredApprovals", requiredApprovals);
+        response.put("approvedCount", 0);
         return ResponseEntity.status(202).body(response);
     }
 
@@ -189,7 +192,7 @@ public class EucController {
         Map<String, Object> job;
         try {
             job = jdbc.queryForMap("""
-                select status, params, requester_user_id
+                select status, params, requester_user_id, required_approvals
                   from report_request
                  where request_id = ? and template_id = 'euc-query'
                 """, requestId);
@@ -262,14 +265,32 @@ public class EucController {
         if (approverUserId.equals(requesterUserId)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "EUC self approval is not allowed");
         }
-        String resultUrl = "APPROVE".equals(action) ? "/api/v1/euc/" + jobId + "/result.zip" : null;
-        String nextStatus = "APPROVE".equals(action) ? "DONE" : "FAILED";
-        String error = "APPROVE".equals(action) ? null : "Rejected by approver";
+
+        Integer duplicateApprovals = jdbc.queryForObject("""
+            select count(*) from report_approval
+             where request_id = ? and approver_user_id = ?
+            """, Integer.class, requestId, approverUserId);
+        if (duplicateApprovals != null && duplicateApprovals > 0) {
+            throw new ResponseStatusException(HttpStatus.CONFLICT, "EUC duplicate approval is not allowed");
+        }
+
+        int requiredApprovals = intValue(job.get("required_approvals"), 1);
+        Integer currentApproved = jdbc.queryForObject("""
+            select count(*) from report_approval
+             where request_id = ? and action = 'APPROVE'
+            """, Integer.class, requestId);
+        int approvedCount = (currentApproved == null ? 0 : currentApproved) + ("APPROVE".equals(action) ? 1 : 0);
+        boolean completed = "APPROVE".equals(action) && approvedCount >= requiredApprovals;
+        String resultUrl = completed ? "/api/v1/euc/" + jobId + "/result.zip" : null;
+        String nextStatus = "REJECT".equals(action) ? "FAILED" : (completed ? "DONE" : "QUEUED");
+        String error = "REJECT".equals(action) ? "Rejected by approver" : null;
         Map<String, Object> approval = new LinkedHashMap<>();
         approval.put("action", action);
         approval.put("approverUserId", approverUserId);
         approval.put("comment", string(approvalBody.get("comment"), null));
         approval.put("actedAt", OffsetDateTime.now().toString());
+        approval.put("approvedCount", approvedCount);
+        approval.put("requiredApprovals", requiredApprovals);
 
         jdbc.update("""
             update report_request
@@ -290,6 +311,8 @@ public class EucController {
         event.put("status", nextStatus);
         event.put("resultUrl", resultUrl);
         event.put("comment", string(approvalBody.get("comment"), null));
+        event.put("approvedCount", approvedCount);
+        event.put("requiredApprovals", requiredApprovals);
         jdbc.update("""
             insert into report_event (request_id, event_type, actor_user_id, details, occurred_at)
             values (?, ?, ?, cast(? as jsonb), ?)
@@ -301,7 +324,9 @@ public class EucController {
         response.put("progress", 100);
         response.put("resultUrl", resultUrl);
         response.put("error", error);
-        response.put("requiresSecondApproval", false);
+        response.put("requiresSecondApproval", "QUEUED".equals(nextStatus));
+        response.put("requiredApprovals", requiredApprovals);
+        response.put("approvedCount", approvedCount);
         return ResponseEntity.ok(response);
     }
 
@@ -321,6 +346,20 @@ public class EucController {
         }
         String text = String.valueOf(value).trim();
         return text.isEmpty() ? fallback : text;
+    }
+
+    private int intValue(Object value, int fallback) {
+        if (value instanceof Number number) {
+            return number.intValue();
+        }
+        if (value == null) {
+            return fallback;
+        }
+        try {
+            return Integer.parseInt(String.valueOf(value));
+        } catch (NumberFormatException e) {
+            return fallback;
+        }
     }
 
     private String json(Map<String, Object> body) {

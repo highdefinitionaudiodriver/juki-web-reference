@@ -60,12 +60,13 @@ DV 等支援措置対象の存在隠蔽を壊さないため、この固定条�
 
 ## 承認・イベント記録
 
-個人番号を含む EUC は `QUEUED` で受け付け、`POST /api/v1/euc/{jobId}/approve` で承認または却下する。
+個人番号を含む EUC は `required_approvals = 2` の `QUEUED` で受け付け、`POST /api/v1/euc/{jobId}/approve` で承認または却下する。
 承認待ち一覧 `GET /api/v1/euc` と承認 API は `ADMIN` ロールに限定する。
+1 人目の承認では `QUEUED` のまま `report_approval(step=1)` を記録し、別の 2 人目が承認した時点で `DONE` に遷移する。
 
 | テーブル | 用途 |
 | --- | --- |
 | `report_approval` | 承認 step / approver / action / comment / acted_at を記録 |
 | `report_event` | `EUC_APPROVE` / `EUC_REJECT` などのイベント details を JSONB で記録 |
 
-同一ユーザによる自己承認は 409 で拒否する。多段承認、専用 WORM 監査は今後の拡張対象。
+同一ユーザによる自己承認、同一承認者の重複承認は 409 で拒否する。専用 WORM 監査は今後の拡張対象。
