@@ -97,6 +97,8 @@ export const api = {
   foreignerExpiryReport: (body: ForeignerExpiryReportReq) =>
     request<ForeignerExpiryJob>("/reports/foreigner-expiring", { method: "POST", body: body as unknown as BodyInit }),
   eucQuery: (body: EucQueryReq) => request<EucAsyncJob>("/euc/query", { method: "POST", body: body as unknown as BodyInit }),
+  eucApprove: (jobId: string, body: { action?: "APPROVE" | "REJECT"; comment?: string | null }) =>
+    request<EucAsyncJob>(`/euc/${jobId}/approve`, { method: "POST", body: body as unknown as BodyInit }),
   async audit(): Promise<AuditLog[]> {
     try { return await request<AuditLog[]>("/audit"); } catch (e) {
       if (!enableFallbackData) throw e;
