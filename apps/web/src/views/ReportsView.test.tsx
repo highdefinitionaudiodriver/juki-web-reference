@@ -69,6 +69,47 @@ describe("ReportsView", () => {
     expect(await screen.findByText(/APPROVE -> DONE/)).toBeInTheDocument();
   });
 
+  it("onEucListQueued が QUEUED 一覧を返すと jobId ボタンが表示される", async () => {
+    const onEucListQueued = vi.fn().mockResolvedValue([
+      {
+        jobId: "EUC-7",
+        status: "QUEUED",
+        requesterUserId: "u-test",
+        outputFields: ["residentId", "myNumber"],
+        includeMyNumber: true,
+      },
+    ]);
+    render(
+      <ReportsView
+        onAnnualReport={vi.fn()}
+        onEucQuery={vi.fn()}
+        onEucApprove={vi.fn()}
+        onEucListQueued={onEucListQueued}
+      />
+    );
+    // useEffect 経由で一覧取得される
+    expect(await screen.findByRole("button", { name: /EUC-7 を承認フォームに設定/ })).toBeInTheDocument();
+    expect(onEucListQueued).toHaveBeenCalled();
+  });
+
+  it("QUEUED 一覧の項目クリックで approveJobId 入力欄に値が入る", async () => {
+    const onEucListQueued = vi.fn().mockResolvedValue([
+      { jobId: "EUC-99", status: "QUEUED", outputFields: ["residentId"], includeMyNumber: false },
+    ]);
+    render(
+      <ReportsView
+        onAnnualReport={vi.fn()}
+        onEucQuery={vi.fn()}
+        onEucApprove={vi.fn()}
+        onEucListQueued={onEucListQueued}
+      />
+    );
+    const user = userEvent.setup();
+    await screen.findByRole("button", { name: /EUC-99 を承認フォームに設定/ });
+    await user.click(screen.getByRole("button", { name: /EUC-99 を承認フォームに設定/ }));
+    expect((screen.getByLabelText("EUC job ID") as HTMLInputElement).value).toBe("EUC-99");
+  });
+
   it("EUC 承認 UI: REJECT ボタンで onEucApprove(jobId, REJECT)", async () => {
     const onEucApprove = vi
       .fn()

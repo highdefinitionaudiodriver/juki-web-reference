@@ -1272,6 +1272,57 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/euc": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /**
+         * EUC 依頼一覧（QUEUED 承認待ち 等）
+         * @description status クエリで状態絞り込み（QUEUED / DONE / FAILED）。未指定は直近 100 件全件。
+         *     承認 UI が承認待ちジョブ一覧を取得して、承認/却下を完結させるための endpoint。
+         */
+        get: {
+            parameters: {
+                query?: {
+                    status?: "QUEUED" | "DONE" | "FAILED";
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": {
+                            jobId?: string;
+                            status?: string;
+                            requesterUserId?: string | null;
+                            /** Format: date-time */
+                            requestedAt?: string | null;
+                            outputFields?: string[];
+                            includeMyNumber?: boolean;
+                            resultUrl?: string | null;
+                        }[];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/euc/query": {
         parameters: {
             query?: never;

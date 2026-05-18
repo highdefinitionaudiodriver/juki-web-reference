@@ -292,6 +292,32 @@ paths:
       parameters: [ { name: jobId, in: path, required: true, schema: { type: string } } ]
       responses:
         '200': { description: OK, content: { application/json: { schema: { $ref: '#/components/schemas/AsyncJob' } } } }
+  /euc:
+    get:
+      tags: [euc]
+      summary: EUC 依頼一覧（QUEUED 承認待ち 等）
+      description: |
+        status クエリで状態絞り込み（QUEUED / DONE / FAILED）。未指定は直近 100 件全件。
+        承認 UI が承認待ちジョブ一覧を取得して、承認/却下を完結させるための endpoint。
+      parameters:
+        - { name: status, in: query, required: false, schema: { type: string, enum: [QUEUED, DONE, FAILED] } }
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: array
+                items:
+                  type: object
+                  properties:
+                    jobId: { type: string }
+                    status: { type: string }
+                    requesterUserId: { type: string, nullable: true }
+                    requestedAt: { type: string, format: date-time, nullable: true }
+                    outputFields: { type: array, items: { type: string } }
+                    includeMyNumber: { type: boolean }
+                    resultUrl: { type: string, nullable: true }
   /euc/query:
     post:
       tags: [euc]

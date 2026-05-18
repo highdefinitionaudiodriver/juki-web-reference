@@ -53,6 +53,51 @@ class EucControllerTest {
     }
 
     @Test
+    void list_withStatusQueued_returnsQueuedJobs() throws Exception {
+        java.sql.Timestamp now = new java.sql.Timestamp(System.currentTimeMillis());
+        // Map.of は null 値を許さないので HashMap
+        java.util.HashMap<String, Object> row = new java.util.HashMap<>();
+        row.put("request_id", 7L);
+        row.put("status", "QUEUED");
+        row.put("requester_user_id", "u-test");
+        row.put("requested_at", now);
+        row.put("params_json", "{\"outputFields\":[\"residentId\",\"myNumber\"],\"includeMyNumber\":true}");
+        row.put("result_url", null);
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("and status = ?"),
+                org.mockito.ArgumentMatchers.eq("QUEUED")))
+            .thenReturn(List.of(row));
+        mvc.perform(get("/api/v1/euc?status=QUEUED")
+                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN")))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].jobId").value("EUC-7"))
+            .andExpect(jsonPath("$[0].status").value("QUEUED"))
+            .andExpect(jsonPath("$[0].requesterUserId").value("u-test"))
+            .andExpect(jsonPath("$[0].includeMyNumber").value(true))
+            .andExpect(jsonPath("$[0].outputFields[1]").value("myNumber"));
+    }
+
+    @Test
+    void list_withoutStatus_returnsAllJobsLimited() throws Exception {
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("order by requested_at desc")))
+            .thenReturn(List.of(
+                java.util.Map.of(
+                    "request_id", 8L,
+                    "status", "DONE",
+                    "requester_user_id", "u-a",
+                    "requested_at", new java.sql.Timestamp(System.currentTimeMillis()),
+                    "params_json", "{\"outputFields\":[\"residentId\"]}",
+                    "result_url", "/api/v1/euc/EUC-8/result.zip"
+                )
+            ));
+        mvc.perform(get("/api/v1/euc")
+                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN")))))
+            .andExpect(status().isOk())
+            .andExpect(jsonPath("$[0].jobId").value("EUC-8"))
+            .andExpect(jsonPath("$[0].status").value("DONE"))
+            .andExpect(jsonPath("$[0].includeMyNumber").value(false));
+    }
+
+    @Test
     void query_withoutMyNumber_returnsDoneStatus() throws Exception {
         mvc.perform(post("/api/v1/euc/query")
                 .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN"))))

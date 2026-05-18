@@ -2,6 +2,7 @@ package jp.go.local.resident.api;
 
 import com.fasterxml.jackson.core.JsonProcessingException;
 import com.fasterxml.jackson.core.type.TypeReference;
+import com.fasterxml.jackson.databind.JsonNode;
 import com.fasterxml.jackson.databind.ObjectMapper;
 import java.io.ByteArrayInputStream;
 import java.io.ByteArrayOutputStream;
@@ -80,6 +81,64 @@ public class EucController {
     public EucController(JdbcTemplate jdbc, ObjectMapper objectMapper) {
         this.jdbc = jdbc;
         this.objectMapper = objectMapper;
+    }
+
+    /**
+     * EUC 依頼の一覧。status クエリで絞り込み（QUEUED / DONE / FAILED）。
+     * 承認 UI が `QUEUED` 一覧を取得して、approve/reject を完結できるようにする。
+     *
+     *   GET /api/v1/euc?status=QUEUED
+     *   GET /api/v1/euc          ← status 未指定なら直近 100 件全件
+     *
+     * 返却項目:
+     *   jobId / status / requesterUserId / requestedAt / outputFields (params から抽出) /
+     *   includeMyNumber / resultUrl
+     */
+    @GetMapping
+    public java.util.List<Map<String, Object>> list(
+            @org.springframework.web.bind.annotation.RequestParam(name = "status", required = false) String status) {
+        java.util.List<Map<String, Object>> rows;
+        if (status == null || status.isBlank()) {
+            rows = jdbc.queryForList("""
+                select request_id, status, requester_user_id, requested_at, params::text as params_json, result_url
+                  from report_request
+                 where template_id = 'euc-query'
+                 order by requested_at desc
+                 limit 100
+                """);
+        } else {
+            rows = jdbc.queryForList("""
+                select request_id, status, requester_user_id, requested_at, params::text as params_json, result_url
+                  from report_request
+                 where template_id = 'euc-query' and status = ?
+                 order by requested_at desc
+                 limit 100
+                """, status);
+        }
+        java.util.List<Map<String, Object>> result = new java.util.ArrayList<>(rows.size());
+        for (Map<String, Object> row : rows) {
+            Map<String, Object> item = new LinkedHashMap<>();
+            Object requestId = row.get("request_id");
+            item.put("jobId", "EUC-" + requestId);
+            item.put("status", row.get("status"));
+            item.put("requesterUserId", row.get("requester_user_id"));
+            item.put("requestedAt", row.get("requested_at"));
+            item.put("resultUrl", row.get("result_url"));
+            // params から outputFields / includeMyNumber を抽出（UI 表示用）
+            try {
+                JsonNode params = objectMapper.readTree(String.valueOf(row.get("params_json")));
+                item.put("includeMyNumber", params.path("includeMyNumber").asBoolean(false)
+                    || params.path("outputFields").toString().contains("\"myNumber\""));
+                java.util.List<String> fields = new java.util.ArrayList<>();
+                params.path("outputFields").forEach(n -> fields.add(n.asText()));
+                item.put("outputFields", fields);
+            } catch (Exception e) {
+                item.put("includeMyNumber", false);
+                item.put("outputFields", java.util.List.of());
+            }
+            result.add(item);
+        }
+        return result;
     }
 
     @PostMapping("/query")

@@ -204,6 +204,13 @@ export function App() {
               return undefined;
             }
           }}
+          onEucListQueued={async () => {
+            try {
+              return await api.eucList("QUEUED");
+            } catch {
+              return [];
+            }
+          }}
         />
       )}
       {view === "restriction" && (
