@@ -41,9 +41,13 @@ public class EucController {
     private static final Map<String, String> FIELD_EXPRESSIONS = Map.of(
         "residentId", "resident_id",
         "name", "family_name_kanji || ' ' || given_name_kanji",
+        "nameKana", "family_name_kana || ' ' || given_name_kana",
         "addressText", "address_text",
+        "addressCode", "address_code",
         "birthDate", "birth_date::text",
         "sex", "sex",
+        "nationality", "nationality",
+        "movedInDate", "moved_in_date::text",
         "householdId", "household_id"
     );
     private static final SecureRandom RANDOM = new SecureRandom();
@@ -126,7 +130,7 @@ public class EucController {
         }
 
         String password = generatePassword();
-        byte[] zip = zipCsvEncrypted(jobId, fields, password);
+        byte[] zip = zipCsvEncrypted(jobId, fields, params, password);
         String passwordHash = sha256Hex(password);
 
         // 監査用にパスワードハッシュを result_url に追記（平文は保存しない）
@@ -186,19 +190,22 @@ public class EucController {
     }
 
     /** AES-256 パスワード付 ZIP を生成する。 */
-    private byte[] zipCsvEncrypted(String jobId, List<String> fields, String password) {
+    private byte[] zipCsvEncrypted(String jobId, List<String> fields, Map<String, Object> params, String password) {
         String select = fields.stream()
             .map(field -> FIELD_EXPRESSIONS.get(field) + " as \"" + field + "\"")
             .reduce((left, right) -> left + ", " + right)
             .orElse("resident_id as \"residentId\"");
-        List<Map<String, Object>> rows = jdbc.queryForList("""
+        WhereClause where = whereClause(filters(params));
+        String sql = """
             select %s
               from resident
              where moved_out_date is null
                and restricted_flag = false
+               %s
              order by resident_id
              limit 1000
-            """.formatted(select));
+            """.formatted(select, where.sql());
+        List<Map<String, Object>> rows = jdbc.queryForList(sql, where.args().toArray());
 
         byte[] csvBytes = csv(fields, rows).getBytes(StandardCharsets.UTF_8);
 
@@ -259,4 +266,94 @@ public class EucController {
         String text = value == null ? "" : String.valueOf(value);
         return "\"" + text.replace("\"", "\"\"") + "\"";
     }
+
+    @SuppressWarnings("unchecked")
+    private Map<String, Object> filters(Map<String, Object> params) {
+        Object filters = params.get("filters");
+        if (filters == null) {
+            return Map.of();
+        }
+        if (filters instanceof Map<?, ?> map) {
+            Map<String, Object> out = new LinkedHashMap<>();
+            map.forEach((key, value) -> out.put(String.valueOf(key), value));
+            return out;
+        }
+        throw new ResponseStatusException(HttpStatus.BAD_REQUEST, "EUC filters must be an object");
+    }
+
+    private WhereClause whereClause(Map<String, Object> filters) {
+        List<String> clauses = new ArrayList<>();
+        List<Object> args = new ArrayList<>();
+        addEquals(clauses, args, filters, "residentId", "resident_id");
+        addEquals(clauses, args, filters, "householdId", "household_id");
+        addEquals(clauses, args, filters, "sex", "sex");
+        addEquals(clauses, args, filters, "addressCode", "address_code");
+        addEquals(clauses, args, filters, "nationality", "nationality");
+        addDateLower(clauses, args, filters, "birthDateFrom", "birth_date");
+        addDateUpper(clauses, args, filters, "birthDateTo", "birth_date");
+        addDateLower(clauses, args, filters, "movedInDateFrom", "moved_in_date");
+        addDateUpper(clauses, args, filters, "movedInDateTo", "moved_in_date");
+        addLike(clauses, args, filters, "residentIdPrefix", "resident_id", false);
+        addLike(clauses, args, filters, "nameContains", "family_name_kanji || ' ' || given_name_kanji", true);
+        addLike(clauses, args, filters, "addressTextContains", "address_text", true);
+        return clauses.isEmpty()
+            ? new WhereClause("", List.of())
+            : new WhereClause("\n               and " + String.join("\n               and ", clauses), args);
+    }
+
+    private void addEquals(List<String> clauses, List<Object> args, Map<String, Object> filters, String key, String column) {
+        String value = stringFilter(filters, key);
+        if (value == null) {
+            return;
+        }
+        clauses.add(column + " = ?");
+        args.add(value);
+    }
+
+    private void addDateLower(List<String> clauses, List<Object> args, Map<String, Object> filters, String key, String column) {
+        String value = stringFilter(filters, key);
+        if (value == null) {
+            return;
+        }
+        clauses.add(column + " >= cast(? as date)");
+        args.add(value);
+    }
+
+    private void addDateUpper(List<String> clauses, List<Object> args, Map<String, Object> filters, String key, String column) {
+        String value = stringFilter(filters, key);
+        if (value == null) {
+            return;
+        }
+        clauses.add(column + " <= cast(? as date)");
+        args.add(value);
+    }
+
+    private void addLike(List<String> clauses, List<Object> args, Map<String, Object> filters,
+                         String key, String expression, boolean contains) {
+        String value = stringFilter(filters, key);
+        if (value == null) {
+            return;
+        }
+        clauses.add(expression + " like ? escape '\\'");
+        String escaped = escapeLike(value);
+        args.add(contains ? "%" + escaped + "%" : escaped + "%");
+    }
+
+    private String stringFilter(Map<String, Object> filters, String key) {
+        Object value = filters.get(key);
+        if (value == null) {
+            return null;
+        }
+        String text = String.valueOf(value).trim();
+        return text.isEmpty() ? null : text;
+    }
+
+    private String escapeLike(String value) {
+        return value
+            .replace("\\", "\\\\")
+            .replace("%", "\\%")
+            .replace("_", "\\_");
+    }
+
+    private record WhereClause(String sql, List<Object> args) {}
 }

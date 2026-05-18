@@ -1998,8 +1998,27 @@ export interface components {
             templateId?: string | null;
             /** @description テンプレ ID なしの場合のみ */
             sql?: string;
-            filters?: Record<string, never>;
-            outputFields?: string[];
+            /** @description Spring 実装では許可リスト化した条件のみ SQL パラメータとして適用する。 */
+            filters?: {
+                residentId?: string;
+                residentIdPrefix?: string;
+                householdId?: string;
+                /** @enum {string} */
+                sex?: "M" | "F" | "U";
+                addressCode?: string;
+                addressTextContains?: string;
+                nameContains?: string;
+                nationality?: string;
+                /** Format: date */
+                birthDateFrom?: string;
+                /** Format: date */
+                birthDateTo?: string;
+                /** Format: date */
+                movedInDateFrom?: string;
+                /** Format: date */
+                movedInDateTo?: string;
+            };
+            outputFields?: ("residentId" | "name" | "nameKana" | "addressText" | "addressCode" | "birthDate" | "sex" | "nationality" | "movedInDate" | "householdId" | "myNumber")[];
             /**
              * @default CSV
              * @enum {string}

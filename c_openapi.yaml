@@ -710,8 +710,28 @@ components:
       properties:
         templateId: { type: string, nullable: true }
         sql:        { type: string, description: テンプレ ID なしの場合のみ }
-        filters:    { type: object }
-        outputFields: { type: array, items: { type: string } }
+        filters:
+          type: object
+          description: Spring 実装では許可リスト化した条件のみ SQL パラメータとして適用する。
+          additionalProperties: false
+          properties:
+            residentId: { type: string }
+            residentIdPrefix: { type: string }
+            householdId: { type: string }
+            sex: { type: string, enum: [M, F, U] }
+            addressCode: { type: string }
+            addressTextContains: { type: string }
+            nameContains: { type: string }
+            nationality: { type: string }
+            birthDateFrom: { type: string, format: date }
+            birthDateTo: { type: string, format: date }
+            movedInDateFrom: { type: string, format: date }
+            movedInDateTo: { type: string, format: date }
+        outputFields:
+          type: array
+          items:
+            type: string
+            enum: [residentId, name, nameKana, addressText, addressCode, birthDate, sex, nationality, movedInDate, householdId, myNumber]
         format:     { type: string, enum: [CSV, XLSX], default: CSV }
         includeMyNumber: { type: boolean, default: false }
 

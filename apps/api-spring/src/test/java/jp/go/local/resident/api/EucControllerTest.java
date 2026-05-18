@@ -11,6 +11,7 @@ import static org.mockito.ArgumentMatchers.anyString;
 import static org.mockito.ArgumentMatchers.eq;
 import static org.mockito.Mockito.lenient;
 import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.verify;
 import static org.mockito.Mockito.when;
 
 import java.io.ByteArrayInputStream;
@@ -18,6 +19,7 @@ import java.nio.charset.StandardCharsets;
 import java.util.List;
 import java.util.Map;
 import net.lingala.zip4j.io.inputstream.ZipInputStream;
+import org.mockito.ArgumentCaptor;
 import org.junit.jupiter.api.BeforeEach;
 import org.junit.jupiter.api.Test;
 import org.springframework.beans.factory.annotation.Autowired;
@@ -104,7 +106,7 @@ class EucControllerTest {
                 "status", "DONE",
                 "params", "{\"outputFields\":[\"residentId\",\"name\",\"addressText\"]}"
             ));
-        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("from resident"))).thenReturn(List.of(
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("from resident"), any(Object[].class))).thenReturn(List.of(
             Map.of("residentId", "R001", "name", "住民 太郎", "addressText", "東京都サンプル市1-1")
         ));
 
@@ -143,7 +145,7 @@ class EucControllerTest {
                 "status", "DONE",
                 "params", "{\"outputFields\":[\"residentId\"]}"
             ));
-        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("from resident"))).thenReturn(List.of(
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("from resident"), any(Object[].class))).thenReturn(List.of(
             Map.of("residentId", "R001")
         ));
 
@@ -171,6 +173,40 @@ class EucControllerTest {
         mvc.perform(get("/api/v1/euc/EUC-43/result.zip")
                 .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN")))))
             .andExpect(status().isConflict());
+    }
+
+    @Test
+    void download_withFilters_buildsWhitelistedWhereClause() throws Exception {
+        when(jdbc.queryForMap(org.mockito.ArgumentMatchers.contains("from report_request"), eq(44L)))
+            .thenReturn(Map.of(
+                "status", "DONE",
+                "params", """
+                    {"outputFields":["residentId","nameKana","birthDate","movedInDate"],
+                     "filters":{"sex":"F","birthDateFrom":"1980-01-01","birthDateTo":"1999-12-31",
+                                "residentIdPrefix":"R-","nameContains":"住民","addressTextContains":"1%_"}}
+                    """
+            ));
+        when(jdbc.queryForList(org.mockito.ArgumentMatchers.contains("from resident"), any(Object[].class)))
+            .thenReturn(List.of());
+
+        mvc.perform(get("/api/v1/euc/EUC-44/result.zip")
+                .with(jwt().jwt(j -> j.claim("roles", List.of("ADMIN")))))
+            .andExpect(status().isOk());
+
+        ArgumentCaptor<String> sql = ArgumentCaptor.forClass(String.class);
+        ArgumentCaptor<Object[]> args = ArgumentCaptor.forClass(Object[].class);
+        verify(jdbc).queryForList(sql.capture(), args.capture());
+
+        org.assertj.core.api.Assertions.assertThat(sql.getValue())
+            .contains("sex = ?")
+            .contains("birth_date >= cast(? as date)")
+            .contains("birth_date <= cast(? as date)")
+            .contains("resident_id like ? escape")
+            .contains("family_name_kanji || ' ' || given_name_kanji like ? escape")
+            .contains("address_text like ? escape")
+            .doesNotContain("1%_");
+        org.assertj.core.api.Assertions.assertThat(args.getValue())
+            .containsExactly("F", "1980-01-01", "1999-12-31", "R-%", "%住民%", "%1\\%\\_%");
     }
 
     @TestConfiguration

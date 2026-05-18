@@ -1,6 +1,6 @@
 # 設計 vs 現状実装 ギャップマトリクス
 
-最終更新: 2026-05-17  
+最終更新: 2026-05-18
 比較対象:
 - **設計**: `住民記録システム_Web版_設計書.xlsx` / `c_openapi.yaml` (40 path / 29 schema) / `b_er_diagram.html` (22 table) / `a_wireframes.html` (13 screen)
 - **実装**: React 19 SPA (`apps/web`) + Node 開発 API (`apps/api`) + Spring Boot 3 (`apps/api-spring`) + Flyway PostgreSQL 16 + OpenHTMLtoPDF
@@ -109,11 +109,11 @@
 
 | 種別 | 現状 |
 | --- | --- |
-| Spring | 94 件（MockMvc/Unit 75 PASS + Testcontainers IT 19 SKIP: Docker なし環境） |
+| Spring | 96 件（MockMvc/Unit 77 PASS + Testcontainers IT 19 SKIP: Docker なし環境） |
 | Vitest | 42 件 PASS（App / Search / Resident / Restriction / Certificate / Official / Move / Reports） |
 | Playwright API | 13 件 PASS |
 | Playwright a11y | 7 画面（住民検索／住民票／証明発行／抑止設定／異動／統計EUC／権限監査） |
-| CI | OpenAPI diff ジョブで `c_openapi.yaml` と Spring runtime `/v3/api-docs` を比較 |
+| CI | Web + Node API / Spring Boot + Testcontainers / Spring OIDC E2E / OpenAPI diff / PDF/A veraPDF の全 5 ジョブ PASS |
 
 ## 結論
 

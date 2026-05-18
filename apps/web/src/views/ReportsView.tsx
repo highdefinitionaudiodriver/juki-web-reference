@@ -2,10 +2,33 @@ import { useState } from "react";
 import type { EucQueryReq, ReportReq } from "../types";
 import { Field } from "../components/Field";
 
+type EucOutputField = NonNullable<EucQueryReq["outputFields"]>[number];
+
+const EUC_OUTPUT_FIELDS = new Set<EucOutputField>([
+  "residentId",
+  "name",
+  "nameKana",
+  "addressText",
+  "addressCode",
+  "birthDate",
+  "sex",
+  "nationality",
+  "movedInDate",
+  "householdId",
+  "myNumber",
+]);
+
 type Props = {
   onAnnualReport: (req: ReportReq) => Promise<void>;
   onEucQuery: (req: EucQueryReq) => Promise<void>;
 };
+
+function parseOutputFields(value: string): EucOutputField[] {
+  return value
+    .split(",")
+    .map((field) => field.trim())
+    .filter((field): field is EucOutputField => EUC_OUTPUT_FIELDS.has(field as EucOutputField));
+}
 
 export function ReportsView({ onAnnualReport, onEucQuery }: Props) {
   const [template, setTemplate] = useState("annual-20-6");
@@ -36,7 +59,7 @@ export function ReportsView({ onAnnualReport, onEucQuery }: Props) {
           onSubmit={async (e) => {
             e.preventDefault();
             await onEucQuery({
-              outputFields: fields.split(",").map((f) => f.trim()).filter(Boolean),
+              outputFields: parseOutputFields(fields),
               includeMyNumber: withMyNumber,
               format: "CSV",
             });
