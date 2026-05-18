@@ -240,6 +240,27 @@ export function App() {
         <AdminView
           audit={audit}
           onRefresh={async () => setAudit(await api.audit())}
+          onEucListQueued={async () => {
+            try {
+              return await api.eucList("QUEUED");
+            } catch {
+              return [];
+            }
+          }}
+          onEucApprove={async (jobId, action, comment) => {
+            try {
+              const job = await api.eucApprove(jobId, { action, comment });
+              notify(
+                job.status === "DONE"
+                  ? `EUC ${jobId} を承認しました。結果: ${job.resultUrl ?? "-"}`
+                  : `EUC ${jobId} を却下しました。状態: ${job.status}`
+              );
+              return job;
+            } catch (e) {
+              setNotice({ kind: "err", message: `EUC 承認に失敗しました: ${String(e)}` });
+              return undefined;
+            }
+          }}
         />
       )}
     </Shell>
