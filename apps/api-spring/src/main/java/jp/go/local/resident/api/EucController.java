@@ -246,7 +246,7 @@ public class EucController {
         Map<String, Object> job;
         try {
             job = jdbc.queryForMap("""
-                select status, params, requester_user_id
+                select status, params, requester_user_id, required_approvals
                   from report_request
                  where request_id = ? and template_id = 'euc-query'
                 """, requestId);
