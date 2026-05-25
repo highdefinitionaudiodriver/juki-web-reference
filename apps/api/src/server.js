@@ -818,6 +818,25 @@ async function handleApi(req, res, reqUrl) {
       resultUrl: needsApproval ? null : "/euc/result.csv",
       error: null,
       requiresSecondApproval: needsApproval,
+      requiredApprovals: needsApproval ? 2 : 1,
+      approvedCount: 0,
+    });
+  }
+
+  const eucApproveMatch = path.match(/^\/euc\/([^/]+)\/approve$/);
+  if (eucApproveMatch && req.method === "POST") {
+    const body = await readBody(req);
+    const action = (body.action || "APPROVE").toUpperCase();
+    const isReject = action === "REJECT";
+    return json(res, 200, {
+      jobId: eucApproveMatch[1],
+      status: isReject ? "FAILED" : "DONE",
+      progress: 100,
+      resultUrl: isReject ? null : `/api/v1/euc/${eucApproveMatch[1]}/result.zip`,
+      error: isReject ? "Rejected by approver" : null,
+      requiresSecondApproval: false,
+      requiredApprovals: 2,
+      approvedCount: isReject ? 0 : 2,
     });
   }
 

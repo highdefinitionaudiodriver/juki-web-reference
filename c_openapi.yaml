@@ -318,6 +318,8 @@ paths:
                     outputFields: { type: array, items: { type: string } }
                     includeMyNumber: { type: boolean }
                     resultUrl: { type: string, nullable: true }
+                    requiredApprovals: { type: integer }
+                    approvedCount: { type: integer }
   /euc/query:
     post:
       tags: [euc]
@@ -789,6 +791,8 @@ components:
         progress:  { type: integer, minimum: 0, maximum: 100 }
         resultUrl: { type: string, format: uri, nullable: true }
         error:     { type: string, nullable: true }
+        requiredApprovals: { type: integer }
+        approvedCount:     { type: integer }
 
     ForeignerExpiryReportReq:
       type: object

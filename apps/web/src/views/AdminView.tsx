@@ -86,6 +86,11 @@ export function AdminView({ audit, onRefresh, onEucListQueued, onEucApprove }: P
                           {(item.outputFields ?? []).join(", ")}
                           {item.includeMyNumber ? " ⚠ 個人番号含む" : ""}
                         </small>
+                        {item.status === "QUEUED" && (
+                          <span style={{ marginLeft: 8, padding: "2px 6px", background: "var(--surface)", border: "1px solid var(--line)", borderRadius: 4, fontSize: "0.8em" }}>
+                            {item.approvedCount ?? 0}/{item.requiredApprovals ?? 1} 承認済み
+                          </span>
+                        )}
                       </td>
                       <td>
                         <button

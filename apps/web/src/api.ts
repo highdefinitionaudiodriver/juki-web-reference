@@ -106,6 +106,8 @@ export const api = {
       outputFields?: string[];
       includeMyNumber?: boolean;
       resultUrl?: string | null;
+      requiredApprovals?: number;
+      approvedCount?: number;
     }>>(`/euc${status ? `?status=${status}` : ""}`),
   eucApprove: (
     jobId: string,

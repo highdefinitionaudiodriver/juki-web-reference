@@ -35,6 +35,7 @@ import org.springframework.dao.EmptyResultDataAccessException;
 import org.springframework.jdbc.core.JdbcTemplate;
 import org.springframework.security.access.prepost.PreAuthorize;
 import org.springframework.security.core.Authentication;
+import org.springframework.transaction.annotation.Transactional;
 import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
@@ -187,7 +188,8 @@ public class EucController {
      * ZIP は AES-256 で暗号化。CSV エントリ名は `{jobId}-result.csv`。
      */
     @GetMapping("/{jobId}/result.zip")
-    public ResponseEntity<byte[]> download(@PathVariable String jobId) {
+    @PreAuthorize("hasRole('ADMIN')")
+    public ResponseEntity<byte[]> download(@PathVariable String jobId, Authentication authentication) {
         long requestId = requestId(jobId);
         Map<String, Object> job;
         try {
@@ -202,6 +204,18 @@ public class EucController {
         String status = String.valueOf(job.get("status"));
         if (!"DONE".equals(status)) {
             throw new ResponseStatusException(HttpStatus.CONFLICT, "EUC job is not ready");
+        }
+
+        String callerUserId = requester(authentication);
+        String requesterUserId = String.valueOf(job.get("requester_user_id"));
+        if (!callerUserId.equals(requesterUserId)) {
+            Integer isApprover = jdbc.queryForObject("""
+                select count(*) from report_approval
+                 where request_id = ? and approver_user_id = ? and action = 'APPROVE'
+                """, Integer.class, requestId, callerUserId);
+            if (isApprover == null || isApprover == 0) {
+                throw new ResponseStatusException(HttpStatus.FORBIDDEN, "EUC result access denied");
+            }
         }
 
         Map<String, Object> params = params(job.get("params"));
@@ -233,6 +247,7 @@ public class EucController {
 
     @PostMapping("/{jobId}/approve")
     @PreAuthorize("hasRole('ADMIN')")
+    @Transactional
     public ResponseEntity<Map<String, Object>> approve(@PathVariable String jobId,
                                                        @RequestBody(required = false) Map<String, Object> body,
                                                        Authentication authentication) {
@@ -249,6 +264,7 @@ public class EucController {
                 select status, params, requester_user_id, required_approvals
                   from report_request
                  where request_id = ? and template_id = 'euc-query'
+                 for update
                 """, requestId);
         } catch (EmptyResultDataAccessException e) {
             throw new ResponseStatusException(HttpStatus.NOT_FOUND, "EUC job not found", e);

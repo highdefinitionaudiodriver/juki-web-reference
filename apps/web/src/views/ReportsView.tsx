@@ -10,6 +10,8 @@ export type EucListItem = {
   outputFields?: string[];
   includeMyNumber?: boolean;
   resultUrl?: string | null;
+  requiredApprovals?: number;
+  approvedCount?: number;
 };
 
 type EucOutputField = NonNullable<EucQueryReq["outputFields"]>[number];
@@ -154,6 +156,7 @@ export function ReportsView({ onAnnualReport, onEucQuery, onEucApprove, onEucLis
                         <small className="muted">
                           {item.requesterUserId ?? "-"} / {(item.outputFields ?? []).join(", ")}
                           {item.includeMyNumber ? " / 個人番号含む" : ""}
+                          {item.status === "QUEUED" && ` / ${item.approvedCount ?? 0}/${item.requiredApprovals ?? 1} 承認済み`}
                         </small>
                       </li>
                     ))}

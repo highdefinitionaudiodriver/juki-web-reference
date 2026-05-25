@@ -1310,6 +1310,8 @@ export interface paths {
                             outputFields?: string[];
                             includeMyNumber?: boolean;
                             resultUrl?: string | null;
+                            requiredApprovals?: number;
+                            approvedCount?: number;
                         }[];
                     };
                 };
@@ -2159,6 +2161,8 @@ export interface components {
             /** Format: uri */
             resultUrl?: string | null;
             error?: string | null;
+            requiredApprovals?: number;
+            approvedCount?: number;
         };
         ForeignerExpiryReportReq: {
             /** Format: date */

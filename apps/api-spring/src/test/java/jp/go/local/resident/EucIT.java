@@ -218,6 +218,52 @@ class EucIT {
         }
     }
 
+    @Test
+    void downloadWithoutAdminRole_returns403() throws Exception {
+        String suffix = String.valueOf(System.currentTimeMillis() % 1_000_000L);
+        String userId = "euc-user-noadmin-" + suffix;
+        seedUser(userId);
+
+        MvcResult res = mvc.perform(post("/api/v1/euc/query")
+                .with(jwt().jwt(j -> j.subject(userId)).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"outputFields":["residentId","name","addressText"]}
+                    """))
+            .andReturn();
+        JsonNode body = objectMapper.readTree(res.getResponse().getContentAsString());
+
+        // Call download as ROLE_WINDOW (non-admin)
+        mvc.perform(get("/api/v1/euc/{jobId}/result.zip", body.get("jobId").asText())
+                .with(jwt().jwt(j -> j.subject(userId)).authorities(new SimpleGrantedAuthority("ROLE_WINDOW"))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+    }
+
+    @Test
+    void downloadByNonRequesterAndNonApprover_returns403() throws Exception {
+        String suffix = String.valueOf(System.currentTimeMillis() % 1_000_000L);
+        String requesterId = "euc-req-dl-" + suffix;
+        String strangerId = "euc-str-dl-" + suffix;
+        seedUser(requesterId);
+        seedUser(strangerId);
+
+        MvcResult res = mvc.perform(post("/api/v1/euc/query")
+                .with(jwt().jwt(j -> j.subject(requesterId)).authorities(new SimpleGrantedAuthority("ROLE_ADMIN")))
+                .with(csrf())
+                .contentType(MediaType.APPLICATION_JSON)
+                .content("""
+                    {"outputFields":["residentId","name","addressText"]}
+                    """))
+            .andReturn();
+        JsonNode body = objectMapper.readTree(res.getResponse().getContentAsString());
+
+        // Call download as stranger (different admin who didn't request/approve)
+        mvc.perform(get("/api/v1/euc/{jobId}/result.zip", body.get("jobId").asText())
+                .with(jwt().jwt(j -> j.subject(strangerId)).authorities(new SimpleGrantedAuthority("ROLE_ADMIN"))))
+            .andExpect(org.springframework.test.web.servlet.result.MockMvcResultMatchers.status().isForbidden());
+    }
+
     private long requestId(JsonNode body) {
         return Long.parseLong(body.get("jobId").asText().replace("EUC-", ""));
     }
