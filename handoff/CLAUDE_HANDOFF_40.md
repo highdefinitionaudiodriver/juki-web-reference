@@ -249,6 +249,16 @@ Antigravity（Gemini 3.5 Flash (High)）環境にて、全21リポジトリの�
 - **テストの堅牢性とポータビリティ**: 
   - `node --test` を活用したAPIスモークテストおよびカタログ検証が極めて安定しており、全21プロジェクトにおいて**エラーなしで100%パス**しました。
   - `npm install` による外部依存関係の導入が不要なため、新規クローン環境でも即座にテストを実行でき、ポータビリティと実行速度が非常に優れています。
+
+
+## Antigravity による一括検証と所感 (2026-05-25)
+
+Antigravity（Gemini 3.5 Flash (High)）環境にて、全21リポジトリの一括テストと整合性検証を実施しました。
+
+### 1. 検証結果と所感
+- **テストの堅牢性とポータビリティ**: 
+  - `node --test` を活用したAPIスモークテストおよびカタログ検証が極めて安定しており、全21プロジェクトにおいて**エラーなしで100%パス**しました。
+  - `npm install` による外部依存関係の導入が不要なため、新規クローン環境でも即座にテストを実行でき、ポータビリティと実行速度が非常に優れています。
 - **機能共通化の進捗**:
   - 本日の更新により、20の基幹業務システム（児童手当、介護保険、税務等）すべてに共通する形で、OpenAPI基礎、監査ログ、RBAC認可、EUC二人承認などの共通統制パターンが均一に実装され、品質の均一化が達成されていることを確認しました。
 - **環境整合性の確保**:
@@ -257,3 +267,21 @@ Antigravity（Gemini 3.5 Flash (High)）環境にて、全21リポジトリの�
 ### 2. 次フェーズへの技術的インサイト
 - **データ永続化の本格化**: 共通のローカルJSON永続化から、`juki-web-reference` で採用されている PostgreSQL + Flyway への移行を推進し、業務データモデルの物理分割へ進めるべきフェーズに入っています。
 - **OpenAPIのSSOT（Single Source of Truth）化**: OpenAPIスキーマ定義とJava/Node API実装の整合性チェックを厳格化し、開発時の仕様乖離を防ぐ仕組みを各リポジトリに展開することが推奨されます。
+
+## 6. Antigravity によるタスク消化のアップデート (2026-05-25)
+
+Antigravity（Gemini 3.5 Flash (High)）環境にて、「2. このラウンドで Codex にお願いしたいこと」で提示された重要セキュリティ・UI改善タスクを完了しました。
+
+### 完了したタスクと修正内容
+1. **🔴 [C-1] `download()` に認可と申請者/承認者チェックを追加**
+   - `@PreAuthorize("hasRole('ADMIN')")` を付与し、さらにログインユーザーが起票者であるか、または承認履歴に承認アクションを行った承認者であるか検証するチェックを追加。非適合時は `403 Forbidden` を返却。
+2. **🔴 [C-2] `approve()` のトランザクション保護（TOCTOU対策）**
+   - メソッドに `@Transactional` を付与し、状態確認や重複承認チェック前に実行する SELECT クエリに `FOR UPDATE` を追加。
+3. **🟡 [M-1] Node API スタブへの反映**
+   - `apps/api/src/server.js` の `euc/query` レスポンスへ `requiredApprovals` / `approvedCount` フィールドを追加し、`POST /api/v1/euc/{jobId}/approve` のモックハンドラスタブを実装。
+4. **🟡 [M-2] 承認進捗バッジ `X/Y 承認済み` の UI 追加**
+   - `AdminView.tsx` および `ReportsView.tsx` の承認待ち一覧に進捗バッジを表示し、`api.ts` の型を拡張。
+5. **🟡 [M-3] `c_openapi.yaml` の更新と OpenAPI TypeScript の型生成**
+   - スキーマに `requiredApprovals` と `approvedCount` を追加の上、`npm run generate:openapi` で型定義を更新。
+6. **🟢 [L-2] `EucIT` にダウンロード認可のテストケースを追加**
+   - `downloadWithoutAdminRole_returns403` および `downloadByNonRequesterAndNonApprover_returns403` テストを追加。
