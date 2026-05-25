@@ -104,7 +104,18 @@
 
 ## クイックスタート
 
-### 必要環境
+### 必要環境\n
+- **推奨動作スペック**:
+  - **開発・サーバー実行環境**:
+    - CPU: 2コア/4スレッド以上のx86-64またはARM64プロセッサ (Core i3以上推奨)
+    - メモリ: 8GB RAM以上 (DockerやPostgreSQLなどのデータベースコンテナ同時起動時)
+    - ストレージ: SSD 10GB以上の空き容量
+    - OS: Windows 10/11, macOS, Linux (Ubuntu 20.04+)
+  - **クライアント・ブラウザ環境 (ChromeOS Flex等)**:
+    - CPU: Intel Celeron / Core i3 相当以上
+    - メモリ: 4GB RAM以上
+    - ブラウザ: Google Chrome (最新版推奨), Microsoft Edge (最新版)
+    - 画面解像度: 1366x768 以上 (1920x1080 推奨)
 - Node.js 20+
 - (Spring 版を動かす場合) Java 21 + Maven 3.9 + Docker Desktop
 
