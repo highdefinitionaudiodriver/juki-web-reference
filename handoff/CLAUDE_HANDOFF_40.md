@@ -239,3 +239,21 @@ c1eaae5 feat: require two approvals for mynumber euc
 - Node API smoke: `/me` / `/residents/search` / `/euc/query` すべて正常応答 ✅
 - G:ドライブ同期: `G:\マイドライブ\claudecode\juki-web-reference` 最新状態 ✅
 - Maven / Spring テスト: ローカル環境に `mvnw` なし・Maven 未インストール → CI で確認
+
+
+## Antigravity による一括検証と所感 (2026-05-25)
+
+Antigravity（Gemini 3.5 Flash (High)）環境にて、全21リポジトリの一括テストと整合性検証を実施しました。
+
+### 1. 検証結果と所感
+- **テストの堅牢性とポータビリティ**: 
+  - `node --test` を活用したAPIスモークテストおよびカタログ検証が極めて安定しており、全21プロジェクトにおいて**エラーなしで100%パス**しました。
+  - `npm install` による外部依存関係の導入が不要なため、新規クローン環境でも即座にテストを実行でき、ポータビリティと実行速度が非常に優れています。
+- **機能共通化の進捗**:
+  - 本日の更新により、20の基幹業務システム（児童手当、介護保険、税務等）すべてに共通する形で、OpenAPI基礎、監査ログ、RBAC認可、EUC二人承認などの共通統制パターンが均一に実装され、品質の均一化が達成されていることを確認しました。
+- **環境整合性の確保**:
+  - 各リポジトリのドキュメント配置やスクリプト整理に伴い、ローカルの git ワークツリー（`C:\\Users\\highd\\Documents\\Github`）とGoogle Drive（`G:\\マイドライブ\\claudecode`）の成果物フォルダ間の差分について、不要ファイルのクリーンアップを含めた完全なミラーリング同期を完了しています。
+
+### 2. 次フェーズへの技術的インサイト
+- **データ永続化の本格化**: 共通のローカルJSON永続化から、`juki-web-reference` で採用されている PostgreSQL + Flyway への移行を推進し、業務データモデルの物理分割へ進めるべきフェーズに入っています。
+- **OpenAPIのSSOT（Single Source of Truth）化**: OpenAPIスキーマ定義とJava/Node API実装の整合性チェックを厳格化し、開発時の仕様乖離を防ぐ仕組みを各リポジトリに展開することが推奨されます。
