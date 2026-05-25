@@ -247,3 +247,18 @@ WIP のリファレンス実装のためフォーマルなコントリビュー�
 - 個人・社内利用は無料（MIT ライセンス）
 - 法人・自治体・SI 向け導入支援、カスタマイズ、診断レポート受託は応相談
 - 連絡先：highdefinitionaudiodriver@gmail.com
+
+<!-- CODEX-CURRENT-STATUS:START -->
+## 現状サマリ (2026-05-25)
+
+- 対象: 住民記録システム Web 版（リファレンス実装）
+- 作業ブランチ: main
+- README更新時点の参照コミット: 5ce6427 docs: add recommended specs info to handoff docs
+- Node.js / JavaScript 系プロジェクト。package.json を起点に依存関係とスクリプトを管理。
+- apps ディレクトリ配下にアプリケーション実装を配置。
+- docs ディレクトリ配下に設計・運用・補足資料を配置。
+- tests ディレクトリ配下にテストを配置。
+- 主要な確認コマンド: npm test / npm run check（定義がある場合）
+- 次に進めるなら、README 内の利用手順と既存 docs / tests を起点に、未整備の検証手順・引き継ぎメモ・CI 化を補強する。
+<!-- CODEX-CURRENT-STATUS:END -->
+
