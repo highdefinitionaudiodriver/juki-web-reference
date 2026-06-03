@@ -19,6 +19,7 @@ import { ReportsView } from "./views/ReportsView";
 import { AdminView } from "./views/AdminView";
 import { RestrictionView } from "./views/RestrictionView";
 import { NotificationView } from "./views/NotificationView";
+import { ConvenienceView } from "./views/ConvenienceView";
 
 const NAV: Array<[ViewId, string]> = [
   ["search", "住民検索"],
@@ -28,6 +29,7 @@ const NAV: Array<[ViewId, string]> = [
   ["certificate", "証明発行"],
   ["restriction", "抑止設定"],
   ["notify", "本人通知"],
+  ["conveni", "コンビニ交付"],
   ["reports", "統計/EUC"],
   ["admin", "権限/監査"],
 ];
@@ -197,6 +199,25 @@ export function App() {
               notify(`本人通知登録を廃止しました: ${registrationId}`);
             } catch (e) {
               setNotice({ kind: "err", message: `廃止に失敗しました: ${String(e)}` });
+            }
+          }}
+        />
+      )}
+      {view === "conveni" && (
+        <ConvenienceView
+          resident={selected}
+          loadStatus={() => api.conveniStatus()}
+          loadHistory={() => api.listConveni()}
+          onRequest={async (residentId, storeCode) => {
+            try {
+              const r = await api.requestConveni({ residentId, storeCode });
+              notify(
+                r.status === "ISSUED"
+                  ? `コンビニ交付しました: ${r.conveniId}`
+                  : `コンビニ交付できません（${r.status}）: ${r.reason ?? ""}`,
+              );
+            } catch (e) {
+              setNotice({ kind: "err", message: `コンビニ交付要求に失敗しました: ${String(e)}` });
             }
           }}
         />

@@ -21,6 +21,8 @@ const state = {
   // 本人通知制度（標準仕様書 8.1 標準オプション機能）
   notifyRegistrations: [],
   notifications: [],
+  // コンビニ交付（J-LIS / 自治体中間サーバ連携, SCR-507）
+  conveniRequests: [],
 };
 
 const mime = {
@@ -185,6 +187,68 @@ function triggerHonninTsuchi(residentId, issue, requesterType) {
   };
   state.notifications.unshift(notification);
   return notification;
+}
+
+// コンビニ交付（SCR-507 / 標準仕様書 第5章 証明・連携）:
+// J-LIS・自治体中間サーバ経由のマイナンバーカードによる証明書交付要求を受領する。
+// 支援措置・抑止対象者はコンビニ交付を利用停止（REFUSED）する。
+function receiveConveniRequest(payload) {
+  const now = new Date().toISOString();
+  const record = {
+    conveniId: `CV-${Date.now()}-${state.conveniRequests.length + 1}`,
+    residentId: payload.residentId,
+    formId: payload.formId || "0010001",
+    storeCode: payload.storeCode || "JLIS-STORE",
+    cardSerial: payload.cardSerial || "",
+    requestedAt: now,
+    status: "PENDING",
+    issueId: null,
+    reason: null,
+  };
+  const target = state.residents.find((r) => r.residentId === payload.residentId);
+  if (!target) {
+    record.status = "NOT_FOUND";
+    record.reason = "対象住民が存在しません。";
+  } else if (target.movedOutDate) {
+    record.status = "REFUSED";
+    record.reason = "転出済みのためコンビニ交付できません。";
+  } else if (target.restrictions?.length) {
+    // 支援措置・抑止対象者はコンビニ交付を停止
+    record.status = "REFUSED";
+    record.reason = "支援措置・抑止対象のためコンビニ交付を停止しています。";
+  } else {
+    const issue = {
+      issueId: `CI-${Date.now()}`,
+      residentId: target.residentId,
+      formId: record.formId,
+      copies: 1,
+      fee: 200,
+      verifyToken: `V${Math.random().toString(36).slice(2, 12).toUpperCase()}`,
+      pdfUrl: `/certificates/${target.residentId}-${record.formId}.pdf`,
+      issuedAt: now,
+      channel: "CONVENIENCE",
+      usageText: "コンビニ交付",
+      issuerUserId: "JLIS",
+    };
+    state.certificates.unshift(issue);
+    record.status = "ISSUED";
+    record.issueId = issue.issueId;
+  }
+  state.conveniRequests.unshift(record);
+  return record;
+}
+
+function conveniLinkStatus() {
+  const total = state.conveniRequests.length;
+  const issued = state.conveniRequests.filter((r) => r.status === "ISSUED").length;
+  const refused = state.conveniRequests.filter((r) => r.status === "REFUSED").length;
+  return {
+    partner: "J-LIS / 自治体中間サーバ",
+    linkState: "CONNECTED",
+    serviceHours: "6:30-23:00",
+    checkedAt: new Date().toISOString(),
+    totals: { total, issued, refused, pending: total - issued - refused },
+  };
 }
 
 function codeNotificationFormId(field, operation) {
@@ -956,6 +1020,27 @@ async function handleApi(req, res, reqUrl) {
   if (req.method === "GET" && path === "/notify") {
     if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
     return json(res, 200, state.notifications.slice(0, 100));
+  }
+
+  // コンビニ交付（SCR-507）: J-LIS 連携状態・交付要求受領・履歴
+  if (req.method === "GET" && path === "/certificates/conveni/status") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, conveniLinkStatus());
+  }
+
+  if (req.method === "GET" && path === "/certificates/conveni") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, state.conveniRequests.slice(0, 100));
+  }
+
+  if (req.method === "POST" && path === "/certificates/conveni") {
+    // J-LIS 中間サーバからの交付要求（連携入力）。抑止対象は REFUSED。
+    const body = await readBody(req);
+    if (!body?.residentId) return json(res, 400, { code: "VALIDATION_ERROR", message: "residentId は必須です。" });
+    const record = receiveConveniRequest(body);
+    audit(user, "RECEIVE", "CONVENI_CERTIFICATE", record.conveniId, { residentId: body.residentId, status: record.status });
+    const status = record.status === "ISSUED" ? 201 : record.status === "NOT_FOUND" ? 404 : 200;
+    return json(res, status, record);
   }
 
   if (req.method === "GET" && path === "/audit") return json(res, 200, state.auditLogs.slice(0, 100));

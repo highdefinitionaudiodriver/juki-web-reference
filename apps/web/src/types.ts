@@ -28,7 +28,7 @@ export type ForeignerExpiryReportReq = Schemas["ForeignerExpiryReportReq"];
 export type ForeignerExpiryJob = Schemas["ForeignerExpiryJob"];
 export type AliasName = Schemas["AliasName"];
 
-export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify";
+export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni";
 
 export type SearchCriteria = {
   name: string;
@@ -60,4 +60,25 @@ export type HonninNotification = {
   notifiedAt: string;
   channel: string;
   status: string;
+};
+
+// コンビニ交付（標準仕様書 第5章 / SCR-507）
+export type ConveniRequest = {
+  conveniId: string;
+  residentId: string;
+  formId: string;
+  storeCode: string;
+  cardSerial?: string;
+  requestedAt: string;
+  status: "ISSUED" | "REFUSED" | "NOT_FOUND" | "PENDING";
+  issueId: string | null;
+  reason: string | null;
+};
+
+export type ConveniStatus = {
+  partner: string;
+  linkState: string;
+  serviceHours: string;
+  checkedAt: string;
+  totals: { total: number; issued: number; refused: number; pending: number };
 };

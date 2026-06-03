@@ -25,6 +25,8 @@ import type {
   Transaction,
   NotifyRegistration,
   HonninNotification,
+  ConveniRequest,
+  ConveniStatus,
 } from "./types";
 import { fallbackAuditLogs, fallbackMe, fallbackResidents, fallbackTransactions } from "./data";
 import { getToken } from "./auth";
@@ -149,4 +151,9 @@ export const api = {
   deleteNotifyRegistration: (id: string) =>
     request<null>(`/notify/registrations/${id}`, { method: "DELETE" }),
   listNotifications: () => request<HonninNotification[]>("/notify"),
+  // コンビニ交付（SCR-507）
+  conveniStatus: () => request<ConveniStatus>("/certificates/conveni/status"),
+  listConveni: () => request<ConveniRequest[]>("/certificates/conveni"),
+  requestConveni: (body: { residentId: string; formId?: string; storeCode?: string }) =>
+    request<ConveniRequest>("/certificates/conveni", { method: "POST", body: body as unknown as BodyInit }),
 };

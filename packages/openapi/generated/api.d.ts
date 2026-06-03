@@ -1995,6 +1995,123 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/certificates/conveni/status": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** コンビニ交付 J-LIS 連携状態（SCR-507） */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConveniStatus"];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/certificates/conveni": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** コンビニ交付 履歴一覧 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConveniRequest"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** コンビニ交付要求受領（J-LIS 中間サーバ連携）。抑止対象は REFUSED。 */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        residentId: string;
+                        formId?: string;
+                        storeCode?: string;
+                        cardSerial?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description 利用停止/処理中（REFUSED 等） */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConveniRequest"];
+                    };
+                };
+                /** @description 交付（ISSUED） */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["ConveniRequest"];
+                    };
+                };
+                /** @description 対象住民なし */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2405,6 +2522,34 @@ export interface components {
             notifiedAt?: string;
             channel?: string;
             status?: string;
+        };
+        /** @description コンビニ交付（J-LIS / 中間サーバ）の交付要求記録（SCR-507） */
+        ConveniRequest: {
+            conveniId?: string;
+            residentId?: string;
+            formId?: string;
+            storeCode?: string;
+            cardSerial?: string;
+            /** Format: date-time */
+            requestedAt?: string;
+            /** @enum {string} */
+            status?: "ISSUED" | "REFUSED" | "NOT_FOUND" | "PENDING";
+            issueId?: string | null;
+            reason?: string | null;
+        };
+        /** @description コンビニ交付 J-LIS 連携状態 */
+        ConveniStatus: {
+            partner?: string;
+            linkState?: string;
+            serviceHours?: string;
+            /** Format: date-time */
+            checkedAt?: string;
+            totals?: {
+                total?: number;
+                issued?: number;
+                refused?: number;
+                pending?: number;
+            };
         };
     };
     responses: {

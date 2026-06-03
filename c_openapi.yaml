@@ -482,6 +482,50 @@ paths:
           content:
             application/json: { schema: { type: array, items: { $ref: '#/components/schemas/HonninNotification' } } }
 
+  /certificates/conveni/status:
+    get:
+      tags: [certificate]
+      summary: コンビニ交付 J-LIS 連携状態（SCR-507）
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ConveniStatus' } }
+  /certificates/conveni:
+    get:
+      tags: [certificate]
+      summary: コンビニ交付 履歴一覧
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { type: array, items: { $ref: '#/components/schemas/ConveniRequest' } } }
+    post:
+      tags: [certificate]
+      summary: コンビニ交付要求受領（J-LIS 中間サーバ連携）。抑止対象は REFUSED。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [residentId]
+              properties:
+                residentId: { type: string }
+                formId: { type: string }
+                storeCode: { type: string }
+                cardSerial: { type: string }
+      responses:
+        '201':
+          description: 交付（ISSUED）
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ConveniRequest' } }
+        '200':
+          description: 利用停止/処理中（REFUSED 等）
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/ConveniRequest' } }
+        '404': { description: 対象住民なし }
+
 components:
 
   securitySchemes:
@@ -934,3 +978,31 @@ components:
         notifiedAt:     { type: string, format: date-time }
         channel:        { type: string }
         status:         { type: string }
+    ConveniRequest:
+      type: object
+      description: コンビニ交付（J-LIS / 中間サーバ）の交付要求記録（SCR-507）
+      properties:
+        conveniId:   { type: string }
+        residentId:  { type: string }
+        formId:      { type: string }
+        storeCode:   { type: string }
+        cardSerial:  { type: string }
+        requestedAt: { type: string, format: date-time }
+        status:      { type: string, enum: [ISSUED, REFUSED, NOT_FOUND, PENDING] }
+        issueId:     { type: string, nullable: true }
+        reason:      { type: string, nullable: true }
+    ConveniStatus:
+      type: object
+      description: コンビニ交付 J-LIS 連携状態
+      properties:
+        partner:      { type: string }
+        linkState:    { type: string }
+        serviceHours: { type: string }
+        checkedAt:    { type: string, format: date-time }
+        totals:
+          type: object
+          properties:
+            total:   { type: integer }
+            issued:  { type: integer }
+            refused: { type: integer }
+            pending: { type: integer }
