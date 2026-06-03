@@ -18,6 +18,7 @@ import { CertificateView } from "./views/CertificateView";
 import { ReportsView } from "./views/ReportsView";
 import { AdminView } from "./views/AdminView";
 import { RestrictionView } from "./views/RestrictionView";
+import { NotificationView } from "./views/NotificationView";
 
 const NAV: Array<[ViewId, string]> = [
   ["search", "住民検索"],
@@ -26,6 +27,7 @@ const NAV: Array<[ViewId, string]> = [
   ["official", "職権異動"],
   ["certificate", "証明発行"],
   ["restriction", "抑止設定"],
+  ["notify", "本人通知"],
   ["reports", "統計/EUC"],
   ["admin", "権限/監査"],
 ];
@@ -173,6 +175,29 @@ export function App() {
             const issue = await api.issueCertificate(req);
             notify(`証明書を発行しました。検証トークン: ${issue.verifyToken} / 手数料: ${issue.fee}円`);
             return issue;
+          }}
+        />
+      )}
+      {view === "notify" && (
+        <NotificationView
+          resident={selected}
+          loadRegistrations={() => api.listNotifyRegistrations()}
+          loadNotifications={() => api.listNotifications()}
+          onRegister={async (residentId, note) => {
+            try {
+              await api.registerNotify({ residentId, note });
+              notify(`本人通知制度に登録しました: ${residentId}`);
+            } catch (e) {
+              setNotice({ kind: "err", message: `本人通知登録に失敗しました: ${String(e)}` });
+            }
+          }}
+          onUnregister={async (registrationId) => {
+            try {
+              await api.deleteNotifyRegistration(registrationId);
+              notify(`本人通知登録を廃止しました: ${registrationId}`);
+            } catch (e) {
+              setNotice({ kind: "err", message: `廃止に失敗しました: ${String(e)}` });
+            }
           }}
         />
       )}

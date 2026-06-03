@@ -28,7 +28,7 @@ export type ForeignerExpiryReportReq = Schemas["ForeignerExpiryReportReq"];
 export type ForeignerExpiryJob = Schemas["ForeignerExpiryJob"];
 export type AliasName = Schemas["AliasName"];
 
-export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin";
+export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify";
 
 export type SearchCriteria = {
   name: string;
@@ -38,3 +38,26 @@ export type SearchCriteria = {
 };
 
 export type EucAsyncJob = AsyncJob & { requiresSecondApproval?: boolean };
+
+// 本人通知制度（標準仕様書 8.1 / SCR-801）
+export type NotifyRegistration = {
+  registrationId: string;
+  residentId: string;
+  registeredAt: string;
+  expiresAt: string;
+  status: "ACTIVE" | "INACTIVE";
+  endedAt?: string;
+  note?: string;
+};
+
+export type HonninNotification = {
+  notificationId: string;
+  residentId: string;
+  issueId: string;
+  formId: string;
+  requesterType: string;
+  certifiedAt: string;
+  notifiedAt: string;
+  channel: string;
+  status: string;
+};

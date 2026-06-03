@@ -23,6 +23,8 @@ import type {
   Resident,
   ResidentSearchReq,
   Transaction,
+  NotifyRegistration,
+  HonninNotification,
 } from "./types";
 import { fallbackAuditLogs, fallbackMe, fallbackResidents, fallbackTransactions } from "./data";
 import { getToken } from "./auth";
@@ -140,4 +142,11 @@ export const api = {
   }) => request<Transaction & { parentResidentId: string }>("/transactions/birth", { method: "POST", body: body as unknown as BodyInit }),
   death: (body: { residentId: string; eventDate?: string }) =>
     request<Transaction>("/transactions/death", { method: "POST", body: body as unknown as BodyInit }),
+  // 本人通知制度（SCR-801 / 8.1）
+  registerNotify: (body: { residentId: string; years?: number; note?: string }) =>
+    request<NotifyRegistration>("/notify/registrations", { method: "POST", body: body as unknown as BodyInit }),
+  listNotifyRegistrations: () => request<NotifyRegistration[]>("/notify/registrations"),
+  deleteNotifyRegistration: (id: string) =>
+    request<null>(`/notify/registrations/${id}`, { method: "DELETE" }),
+  listNotifications: () => request<HonninNotification[]>("/notify"),
 };

@@ -434,6 +434,54 @@ paths:
           content:
             application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AuditLog' } } }
 
+  /notify/registrations:
+    get:
+      tags: [notify]
+      summary: 本人通知制度 登録一覧（標準仕様書 8.1 / SCR-801）
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { type: array, items: { $ref: '#/components/schemas/NotifyRegistration' } } }
+    post:
+      tags: [notify]
+      summary: 本人通知制度 事前登録
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [residentId]
+              properties:
+                residentId: { type: string }
+                years: { type: integer, default: 3 }
+                note: { type: string }
+      responses:
+        '201':
+          description: 登録
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/NotifyRegistration' } }
+        '409': { description: 既に登録済み }
+  /notify/registrations/{registrationId}:
+    delete:
+      tags: [notify]
+      summary: 本人通知制度 登録廃止
+      parameters:
+        - { name: registrationId, in: path, required: true, schema: { type: string } }
+      responses:
+        '204': { description: 廃止 }
+        '404': { description: 未登録 }
+  /notify:
+    get:
+      tags: [notify]
+      summary: 本人通知 発出記録一覧
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { type: array, items: { $ref: '#/components/schemas/HonninNotification' } } }
+
 components:
 
   securitySchemes:
@@ -862,3 +910,27 @@ components:
         resourceId:   { type: string }
         occurredAt:   { type: string, format: date-time }
         details:      { type: object, additionalProperties: true }
+    NotifyRegistration:
+      type: object
+      description: 本人通知制度の事前登録（標準仕様書 8.1）
+      properties:
+        registrationId: { type: string }
+        residentId:     { type: string }
+        registeredAt:   { type: string, format: date-time }
+        expiresAt:      { type: string, format: date }
+        status:         { type: string, enum: [ACTIVE, INACTIVE] }
+        endedAt:        { type: string, format: date-time }
+        note:           { type: string }
+    HonninNotification:
+      type: object
+      description: 第三者・代理人交付に伴う本人通知の発出記録
+      properties:
+        notificationId: { type: string }
+        residentId:     { type: string }
+        issueId:        { type: string }
+        formId:         { type: string }
+        requesterType:  { type: string, enum: [THIRD_PARTY, PROXY, DELEGATE] }
+        certifiedAt:    { type: string, format: date-time }
+        notifiedAt:     { type: string, format: date-time }
+        channel:        { type: string }
+        status:         { type: string }

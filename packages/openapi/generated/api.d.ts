@@ -1844,6 +1844,157 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/notify/registrations": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 本人通知制度 登録一覧（標準仕様書 8.1 / SCR-801） */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NotifyRegistration"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        /** 本人通知制度 事前登録 */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        residentId: string;
+                        /** @default 3 */
+                        years?: number;
+                        note?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description 登録 */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["NotifyRegistration"];
+                    };
+                };
+                /** @description 既に登録済み */
+                409: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notify/registrations/{registrationId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** 本人通知制度 登録廃止 */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    registrationId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 廃止 */
+                204: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description 未登録 */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/notify": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 本人通知 発出記録一覧 */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["HonninNotification"][];
+                    };
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
 }
 export type webhooks = Record<string, never>;
 export interface components {
@@ -2225,6 +2376,35 @@ export interface components {
             details?: {
                 [key: string]: unknown;
             };
+        };
+        /** @description 本人通知制度の事前登録（標準仕様書 8.1） */
+        NotifyRegistration: {
+            registrationId?: string;
+            residentId?: string;
+            /** Format: date-time */
+            registeredAt?: string;
+            /** Format: date */
+            expiresAt?: string;
+            /** @enum {string} */
+            status?: "ACTIVE" | "INACTIVE";
+            /** Format: date-time */
+            endedAt?: string;
+            note?: string;
+        };
+        /** @description 第三者・代理人交付に伴う本人通知の発出記録 */
+        HonninNotification: {
+            notificationId?: string;
+            residentId?: string;
+            issueId?: string;
+            formId?: string;
+            /** @enum {string} */
+            requesterType?: "THIRD_PARTY" | "PROXY" | "DELEGATE";
+            /** Format: date-time */
+            certifiedAt?: string;
+            /** Format: date-time */
+            notifiedAt?: string;
+            channel?: string;
+            status?: string;
         };
     };
     responses: {

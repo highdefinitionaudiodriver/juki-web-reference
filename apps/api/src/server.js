@@ -18,6 +18,9 @@ const state = {
   auditLogs: structuredClone(auditLogs),
   linkEvents: [],
   jobs: [],
+  // 本人通知制度（標準仕様書 8.1 標準オプション機能）
+  notifyRegistrations: [],
+  notifications: [],
 };
 
 const mime = {
@@ -152,6 +155,36 @@ function issueCertificate(user, residentId, formId, copies, usageText) {
   };
   state.certificates.unshift(issue);
   return issue;
+}
+
+// 本人通知制度（標準仕様書 8.1）:
+// 第三者・代理人請求で証明書が交付された場合、事前登録済みの本人へ通知を発出する。
+const THIRD_PARTY_REQUESTERS = new Set(["THIRD_PARTY", "PROXY", "DELEGATE"]);
+
+function activeNotifyRegistration(residentId) {
+  return state.notifyRegistrations.find(
+    (r) => r.residentId === residentId && r.status === "ACTIVE",
+  );
+}
+
+function triggerHonninTsuchi(residentId, issue, requesterType) {
+  if (!requesterType || !THIRD_PARTY_REQUESTERS.has(String(requesterType).toUpperCase())) {
+    return null;
+  }
+  if (!activeNotifyRegistration(residentId)) return null;
+  const notification = {
+    notificationId: `NT-${Date.now()}-${state.notifications.length + 1}`,
+    residentId,
+    issueId: issue.issueId,
+    formId: issue.formId,
+    requesterType: String(requesterType).toUpperCase(),
+    certifiedAt: issue.issuedAt,
+    notifiedAt: new Date().toISOString(),
+    channel: "POSTAL",
+    status: "NOTIFIED",
+  };
+  state.notifications.unshift(notification);
+  return notification;
 }
 
 function codeNotificationFormId(field, operation) {
@@ -660,7 +693,12 @@ async function handleApi(req, res, reqUrl) {
     const body = await readBody(req);
     const issue = issueCertificate(user, body.residentId, body.formId || "0010001", Number(body.copies || 1), body.usageText || "窓口請求");
     audit(user, "ISSUE", "CERTIFICATE", issue.issueId, body);
-    return json(res, 201, issue);
+    // 本人通知制度: 第三者・代理人請求なら登録済み本人へ通知
+    const notification = triggerHonninTsuchi(body.residentId, issue, body.requesterType);
+    if (notification) {
+      audit(user, "NOTIFY", "HONNIN_TSUCHI", notification.notificationId, { residentId: body.residentId, requesterType: notification.requesterType });
+    }
+    return json(res, 201, { ...issue, honninTsuchi: notification });
   }
 
   const certificatePdfMatch = path.match(/^\/certificates\/([^/]+)\/pdf$/);
@@ -872,6 +910,52 @@ async function handleApi(req, res, reqUrl) {
     if (!removed) return json(res, 404, { code: "NOT_FOUND" });
     audit(user, "DELETE", "RESTRICTION", restrictionMatch[1], { residentId: removed });
     res.writeHead(204); return res.end();
+  }
+
+  // 本人通知制度（SCR-801 / 標準仕様書 8.1）: 事前登録・廃止・登録一覧・通知記録
+  if (req.method === "POST" && path === "/notify/registrations") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const target = state.residents.find((r) => r.residentId === body.residentId);
+    if (!target) return json(res, 404, { code: "NOT_FOUND", message: "対象住民が見つかりません。" });
+    if (activeNotifyRegistration(body.residentId)) {
+      return json(res, 409, { code: "ALREADY_REGISTERED", message: "既に本人通知制度に登録済みです。" });
+    }
+    const now = new Date();
+    const expires = new Date(now.getTime());
+    expires.setFullYear(expires.getFullYear() + Number(body.years || 3));
+    const registration = {
+      registrationId: `HT-${Date.now()}`,
+      residentId: body.residentId,
+      registeredAt: now.toISOString(),
+      expiresAt: expires.toISOString().slice(0, 10),
+      status: "ACTIVE",
+      note: body.note || "",
+    };
+    state.notifyRegistrations.unshift(registration);
+    audit(user, "CREATE", "NOTIFY_REGISTRATION", registration.registrationId, { residentId: body.residentId });
+    return json(res, 201, registration);
+  }
+
+  if (req.method === "GET" && path === "/notify/registrations") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, state.notifyRegistrations);
+  }
+
+  const notifyRegMatch = path.match(/^\/notify\/registrations\/([^/]+)$/);
+  if (notifyRegMatch && req.method === "DELETE") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const reg = state.notifyRegistrations.find((r) => r.registrationId === notifyRegMatch[1]);
+    if (!reg) return json(res, 404, { code: "NOT_FOUND" });
+    reg.status = "INACTIVE";
+    reg.endedAt = new Date().toISOString();
+    audit(user, "DELETE", "NOTIFY_REGISTRATION", reg.registrationId, { residentId: reg.residentId });
+    res.writeHead(204); return res.end();
+  }
+
+  if (req.method === "GET" && path === "/notify") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, state.notifications.slice(0, 100));
   }
 
   if (req.method === "GET" && path === "/audit") return json(res, 200, state.auditLogs.slice(0, 100));
