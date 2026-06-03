@@ -105,4 +105,23 @@ describe("ResidentView", () => {
     expect(screen.getByText("2027-10-19")).toBeInTheDocument();
     expect(screen.getByText("中華人民共和国")).toBeInTheDocument();
   });
+
+  it("世帯員を表示ボタンで onLoadHousehold が呼ばれ世帯員を一覧表示する", async () => {
+    const member: Resident = { ...baseResident, residentId: "R-002", givenNameKanji: "次郎", relationToHead: "子" };
+    const onLoadHousehold = vi.fn().mockResolvedValue([baseResident, member]);
+    render(
+      <ResidentView
+        resident={baseResident}
+        history={[]}
+        onUnmask={vi.fn()}
+        onUpdateAddress={vi.fn()}
+        onLoadHousehold={onLoadHousehold}
+      />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "世帯員を表示" }));
+    expect(onLoadHousehold).toHaveBeenCalledWith(baseResident.residentId);
+    await screen.findByText(/次郎/);
+  });
+
 });

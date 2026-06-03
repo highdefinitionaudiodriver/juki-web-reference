@@ -699,6 +699,21 @@ async function handleApi(req, res, reqUrl) {
     audit(user, "VIEW", "RESIDENT", resident.residentId, { unmask });
     return json(res, 200, masked);
   }
+
+  // SCR-414 世帯: 同一世帯の世帯員照会
+  const householdMatch = path.match(/^\/residents\/([^/]+)\/household$/);
+  if (householdMatch && req.method === "GET") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const resident = state.residents.find((item) => item.residentId === householdMatch[1]);
+    if (!resident) return json(res, 404, { code: "NOT_FOUND", message: "該当する住民はありません。" });
+    const members = state.residents
+      .filter((r) => r.householdId === resident.householdId && !r.movedOutDate)
+      .map((r) => applyResidentMask(user, r))
+      .filter(Boolean);
+    audit(user, "VIEW", "HOUSEHOLD", resident.householdId, { members: members.length });
+    return json(res, 200, { householdId: resident.householdId, total: members.length, members });
+  }
+
   if (residentMatch && req.method === "PUT") {
     if (!canAction(user, "TRANSACTION") && !canAction(user, "MOVE_IN_APPLY")) return json(res, 403, { code: "FORBIDDEN" });
     const body = await readBody(req);

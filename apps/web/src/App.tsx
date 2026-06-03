@@ -150,6 +150,7 @@ export function App() {
             setHistory(await api.history(selected.residentId!));
             notify("住民情報を更新し、異動履歴に記録しました。");
           }}
+          onLoadHousehold={(rid) => api.household(rid)}
         />
       )}
       {view === "move" && (

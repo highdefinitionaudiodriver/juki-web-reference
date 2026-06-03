@@ -105,6 +105,22 @@ paths:
           description: OK
           content:
             application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Transaction' } } }
+  /residents/{residentId}/household:
+    get:
+      tags: [residents]
+      summary: 同一世帯の世帯員照会（SCR-414）
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json:
+              schema:
+                type: object
+                properties:
+                  householdId: { type: string }
+                  total: { type: integer }
+                  members: { type: array, items: { $ref: '#/components/schemas/Resident' } }
+        '404': { description: Not found }
   /residents/search/export:
     post:
       tags: [residents]

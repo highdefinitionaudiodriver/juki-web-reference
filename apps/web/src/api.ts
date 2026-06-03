@@ -111,6 +111,10 @@ export const api = {
       return fallbackTransactions.filter((tx) => tx.residentId === id);
     }
   },
+  async household(residentId: string): Promise<Resident[]> {
+    const r = await request<{ householdId: string; total: number; members: Resident[] }>(`/residents/${residentId}/household`);
+    return r.members;
+  },
   moveIn: (body: MoveInReq) => request<Transaction>("/transactions/in", { method: "POST", body: body as unknown as BodyInit }),
   moveOut: (body: MoveOutReq) => request<Transaction & { certificate: CertificateIssue }>("/transactions/out", { method: "POST", body: body as unknown as BodyInit }),
   officialTransaction: (body: OfficialTxReq) => request<Transaction>("/transactions/official", { method: "POST", body: body as unknown as BodyInit }),

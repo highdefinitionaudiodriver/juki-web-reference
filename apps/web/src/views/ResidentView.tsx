@@ -8,13 +8,15 @@ type Props = {
   history: Transaction[];
   onUnmask: () => void;
   onUpdateAddress: (addressText: string, eventDate: string) => Promise<void>;
+  onLoadHousehold?: (residentId: string) => Promise<Resident[]>;
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function ResidentView({ resident, history, onUnmask, onUpdateAddress }: Props) {
+export function ResidentView({ resident, history, onUnmask, onUpdateAddress, onLoadHousehold }: Props) {
   const [address, setAddress] = useState("");
   const [date, setDate] = useState(today());
+  const [members, setMembers] = useState<Resident[] | null>(null);
 
   if (!resident) {
     return <section className="panel empty">住民検索から対象者を選択してください。</section>;
@@ -79,6 +81,32 @@ export function ResidentView({ resident, history, onUnmask, onUpdateAddress }: P
             </article>
           ))}
         </div>
+
+        {onLoadHousehold && (
+          <div className="section-head" style={{ marginTop: 16 }}>
+            <h3>世帯員</h3>
+            <button
+              onClick={async () => {
+                if (resident.residentId) setMembers(await onLoadHousehold(resident.residentId));
+              }}
+            >
+              世帯員を表示
+            </button>
+          </div>
+        )}
+        {members && (
+          members.length === 0 ? (
+            <p className="muted">世帯員が取得できませんでした。</p>
+          ) : (
+            <ul className="member-list">
+              {members.map((m) => (
+                <li key={m.residentId}>
+                  {m.familyNameKanji} {m.givenNameKanji}（{m.relationToHead ?? "—"}）
+                </li>
+              ))}
+            </ul>
+          )
+        )}
       </section>
     </div>
   );
