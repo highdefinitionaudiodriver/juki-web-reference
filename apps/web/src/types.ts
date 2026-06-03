@@ -28,7 +28,21 @@ export type ForeignerExpiryReportReq = Schemas["ForeignerExpiryReportReq"];
 export type ForeignerExpiryJob = Schemas["ForeignerExpiryJob"];
 export type AliasName = Schemas["AliasName"];
 
-export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts" | "eucdesign";
+export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts" | "eucdesign" | "batch";
+
+// バッチ管理（標準仕様書 9）
+export type BatchType = { type: string; name: string; description: string };
+export type BatchJob = {
+  jobId: string;
+  type: string;
+  name: string;
+  status: string;
+  startedAt: string;
+  finishedAt: string;
+  processed: number;
+  details: Record<string, number>;
+  executedBy?: string;
+};
 
 // EUC設計（SCR-A01）
 export type EucTemplate = {

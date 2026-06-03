@@ -24,6 +24,7 @@ import { AliasView } from "./views/AliasView";
 import { SpecialPermanentView } from "./views/SpecialPermanentView";
 import { AlertSettingsView } from "./views/AlertSettingsView";
 import { EucDesignView } from "./views/EucDesignView";
+import { BatchView } from "./views/BatchView";
 
 const NAV: Array<[ViewId, string]> = [
   ["search", "住民検索"],
@@ -38,6 +39,7 @@ const NAV: Array<[ViewId, string]> = [
   ["conveni", "コンビニ交付"],
   ["reports", "統計/EUC"],
   ["eucdesign", "EUC設計"],
+  ["batch", "バッチ"],
   ["alerts", "アラート設定"],
   ["admin", "権限/監査"],
 ];
@@ -263,6 +265,19 @@ export function App() {
               );
             } catch (e) {
               setNotice({ kind: "err", message: `コンビニ交付要求に失敗しました: ${String(e)}` });
+            }
+          }}
+        />
+      )}
+      {view === "batch" && (
+        <BatchView
+          load={() => api.listBatchJobs()}
+          onRun={async (type) => {
+            try {
+              const job = await api.runBatch(type);
+              notify(`バッチ「${job.name}」を実行しました（処理件数: ${job.processed}）。`);
+            } catch (e) {
+              setNotice({ kind: "err", message: `バッチ実行に失敗しました: ${String(e)}` });
             }
           }}
         />

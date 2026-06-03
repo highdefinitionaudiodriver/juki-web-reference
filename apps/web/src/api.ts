@@ -32,6 +32,8 @@ import type {
   AlertRules,
   AlertItem,
   EucTemplate,
+  BatchType,
+  BatchJob,
 } from "./types";
 import { fallbackAuditLogs, fallbackMe, fallbackResidents, fallbackTransactions } from "./data";
 import { getToken } from "./auth";
@@ -181,6 +183,9 @@ export const api = {
   createEucTemplate: (body: { name: string; domain?: string; outputFields: string[]; includeMyNumber?: boolean }) =>
     request<EucTemplate>("/euc-templates", { method: "POST", body: body as unknown as BodyInit }),
   deleteEucTemplate: (id: string) => request<null>(`/euc-templates/${id}`, { method: "DELETE" }),
+  // バッチ管理（標準仕様書 9）
+  listBatchJobs: () => request<{ types: BatchType[]; history: BatchJob[] }>("/batch-jobs"),
+  runBatch: (type: string) => request<BatchJob>(`/batch-jobs/${type}/run`, { method: "POST" }),
   // コンビニ交付（SCR-507）
   conveniStatus: () => request<ConveniStatus>("/certificates/conveni/status"),
   listConveni: () => request<ConveniRequest[]>("/certificates/conveni"),

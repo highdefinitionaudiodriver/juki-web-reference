@@ -25,6 +25,8 @@ const state = {
   conveniRequests: [],
   // EUC設計（SCR-A01 / BAT-012 EUCデータ抽出）: 再利用可能な抽出テンプレート
   eucTemplates: [],
+  // バッチ管理（標準仕様書 9 バッチ / BAT-001〜）: 実行履歴
+  batchJobs: [],
   // エラー・アラート設定 / アクセスログ分析（SCR-A04 / 標準仕様書 11, BAT-011）
   alertRules: {
     nightAccessEnabled: true,
@@ -63,6 +65,63 @@ function analyzeAlerts(rules, logs) {
     }
   }
   return alerts;
+}
+
+// バッチ管理（標準仕様書 9 バッチ）: 主要バッチの定義と実行（同期実行のリファレンス）
+const BATCH_TYPES = [
+  { type: "CS_IMPORT", name: "CS連携電文取込 (BAT-CS)", description: "住基ネットCSからの異動・本人確認情報を取り込む" },
+  { type: "RECONCILE", name: "本人確認情報 整合性確認 (BAT-RC)", description: "CS側本人確認情報と住民記録の突合" },
+  { type: "ANNUAL_AGGREGATE", name: "住基年報 集計 (BAT-AR)", description: "住民基本台帳関係年報の集計" },
+  { type: "FOREIGNER_EXPIRY", name: "在留期間満了 事前通知抽出 (BAT-FE)", description: "在留期間満了が近い外国人住民を抽出" },
+  { type: "SPECIAL_PERMANENT_EXPIRY", name: "特別永住者証明書 満了抽出 (BAT-SP)", description: "特別永住者証明書の満了予定を抽出" },
+];
+
+function runBatch(def, user) {
+  const startedAt = new Date().toISOString();
+  let processed = 0;
+  const details = {};
+  switch (def.type) {
+    case "RECONCILE": {
+      processed = state.residents.length;
+      details.mismatches = 0;
+      break;
+    }
+    case "ANNUAL_AGGREGATE": {
+      processed = state.residents.length;
+      details.population = state.residents.filter((r) => !r.movedOutDate).length;
+      details.foreigners = state.residents.filter((r) => r.foreigner && !r.movedOutDate).length;
+      break;
+    }
+    case "FOREIGNER_EXPIRY": {
+      const limit = Date.now() + 30 * 86400000;
+      processed = state.residents.filter((r) => !r.movedOutDate && r.foreigner?.residencePeriodEnd && Date.parse(r.foreigner.residencePeriodEnd) <= limit).length;
+      details.targets = processed;
+      break;
+    }
+    case "SPECIAL_PERMANENT_EXPIRY": {
+      const limit = Date.now() + 90 * 86400000;
+      processed = state.residents.filter((r) => !r.movedOutDate && r.specialPermanentCert && Date.parse(r.specialPermanentCert.expiryDate) <= limit).length;
+      details.targets = processed;
+      break;
+    }
+    case "CS_IMPORT":
+    default: {
+      processed = state.linkEvents.length;
+      details.applied = state.linkEvents.length;
+      break;
+    }
+  }
+  return {
+    jobId: `BATCH-${Date.now()}`,
+    type: def.type,
+    name: def.name,
+    status: "DONE",
+    startedAt,
+    finishedAt: new Date().toISOString(),
+    processed,
+    details,
+    executedBy: user.userId,
+  };
 }
 
 const mime = {
@@ -1111,6 +1170,22 @@ async function handleApi(req, res, reqUrl) {
     if (state.eucTemplates.length === before) return json(res, 404, { code: "NOT_FOUND" });
     audit(user, "DELETE", "EUC_TEMPLATE", eucTemplateMatch[1], {});
     res.writeHead(204); return res.end();
+  }
+
+  // バッチ管理（標準仕様書 9 バッチ / BAT-001〜）: 定義一覧・実行・履歴
+  if (req.method === "GET" && path === "/batch-jobs") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, { types: BATCH_TYPES, history: state.batchJobs.slice(0, 100) });
+  }
+  const batchRunMatch = path.match(/^\/batch-jobs\/([A-Z_]+)\/run$/);
+  if (batchRunMatch && req.method === "POST") {
+    if (!canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
+    const def = BATCH_TYPES.find((b) => b.type === batchRunMatch[1]);
+    if (!def) return json(res, 404, { code: "NOT_FOUND", message: "未知のバッチ種別です。" });
+    const job = runBatch(def, user);
+    state.batchJobs.unshift(job);
+    audit(user, "EXECUTE", "BATCH", job.jobId, { type: def.type, processed: job.processed });
+    return json(res, 202, job);
   }
 
   if (req.method === "POST" && path === "/restrictions") {

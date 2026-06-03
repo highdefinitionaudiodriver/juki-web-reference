@@ -469,6 +469,18 @@ paths:
     post: { tags: [admin], summary: ロール作成, responses: { '201': { description: Created } } }
   /admin/permissions:
     post: { tags: [admin], summary: 権限マトリクス更新, responses: { '200': { description: OK } } }
+  /batch-jobs:
+    get:
+      tags: [admin]
+      summary: バッチ定義一覧・実行履歴（標準仕様書 9 バッチ）
+      responses: { '200': { description: OK } }
+  /batch-jobs/{type}/run:
+    post:
+      tags: [admin]
+      summary: バッチ実行（CS取込/整合性確認/年報集計/満了抽出 等）
+      parameters:
+        - { name: type, in: path, required: true, schema: { type: string } }
+      responses: { '202': { description: Accepted }, '404': { description: Unknown batch type } }
   /euc-templates:
     get:
       tags: [admin]
