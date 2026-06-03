@@ -28,6 +28,7 @@ import type {
   ConveniRequest,
   ConveniStatus,
   AliasRecord,
+  SpecialPermanentCert,
 } from "./types";
 import { fallbackAuditLogs, fallbackMe, fallbackResidents, fallbackTransactions } from "./data";
 import { getToken } from "./auth";
@@ -158,6 +159,15 @@ export const api = {
     request<AliasRecord>(`/residents/${residentId}/alias`, { method: "POST", body: body as unknown as BodyInit }),
   removeAlias: (residentId: string, aliasId: string) =>
     request<AliasRecord>(`/residents/${residentId}/alias/${aliasId}`, { method: "DELETE" }),
+  // 特別永住者管理（SCR-802）
+  getSpecialPermanent: (residentId: string) =>
+    request<SpecialPermanentCert | null>(`/residents/${residentId}/special-permanent`),
+  putSpecialPermanent: (residentId: string, body: { certNumber: string; issuedDate?: string; note?: string }) =>
+    request<SpecialPermanentCert & { residentId: string; expiresWithin90Days: boolean }>(
+      `/residents/${residentId}/special-permanent`, { method: "PUT", body: body as unknown as BodyInit }),
+  listSpecialPermanentExpiring: (days = 90) =>
+    request<{ days: number; total: number; data: Array<SpecialPermanentCert & { residentId: string; name: string }> }>(
+      `/special-permanent/expiring?days=${days}`),
   // コンビニ交付（SCR-507）
   conveniStatus: () => request<ConveniStatus>("/certificates/conveni/status"),
   listConveni: () => request<ConveniRequest[]>("/certificates/conveni"),

@@ -28,7 +28,15 @@ export type ForeignerExpiryReportReq = Schemas["ForeignerExpiryReportReq"];
 export type ForeignerExpiryJob = Schemas["ForeignerExpiryJob"];
 export type AliasName = Schemas["AliasName"];
 
-export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias";
+export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special";
+
+// 特別永住者証明書（SCR-802）
+export type SpecialPermanentCert = {
+  certNumber: string;
+  issuedDate: string;
+  expiryDate: string;
+  note?: string;
+};
 
 // 通称・旧氏管理（SCR-103）
 export type AliasRecord = {

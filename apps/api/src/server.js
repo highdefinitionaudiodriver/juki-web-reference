@@ -318,6 +318,35 @@ function updateForeignerInfo(resident, body) {
   };
 }
 
+// SCR-802 特別永住者管理: 特別永住者証明書の交付・有効期間満了日算出
+//   有効期間: 交付時 16 歳未満は 16 歳の誕生日、16 歳以上は交付日から 7 年。
+function addYears(iso, years) {
+  const d = new Date(iso);
+  d.setFullYear(d.getFullYear() + years);
+  return d.toISOString().slice(0, 10);
+}
+function computeSpecialPermanentExpiry(birthDate, issuedDate) {
+  const sixteenth = addYears(birthDate, 16);
+  return Date.parse(issuedDate) < Date.parse(sixteenth) ? sixteenth : addYears(issuedDate, 7);
+}
+function updateSpecialPermanent(resident, body) {
+  if (!body.certNumber) {
+    return { status: 400, body: { code: "VALIDATION_ERROR", message: "certNumber は必須です。" } };
+  }
+  const issuedDate = body.issuedDate || new Date().toISOString().slice(0, 10);
+  const expiryDate = computeSpecialPermanentExpiry(resident.birthDate, issuedDate);
+  const cert = {
+    certNumber: body.certNumber,
+    issuedDate,
+    expiryDate,
+    note: body.note || "",
+  };
+  resident.specialPermanentCert = cert;
+  resident.foreigner = { ...(resident.foreigner || {}), specialPermanentResident: true };
+  const diffDays = Math.ceil((Date.parse(expiryDate) - Date.now()) / 86400000);
+  return { status: 200, body: { residentId: resident.residentId, ...cert, expiresWithin90Days: diffDays <= 90 } };
+}
+
 function issueForeignerExpiryNotices(user, body = {}) {
   const baseDate = body.baseDate || new Date().toISOString().slice(0, 10);
   const days = Number(body.days || 30);
@@ -598,6 +627,33 @@ async function handleApi(req, res, reqUrl) {
     target.validTo = new Date().toISOString().slice(0, 10);
     audit(user, "UPDATE", "ALIAS", resident.residentId, { aliasId: target.aliasId, action: "廃止" });
     return json(res, 200, target);
+  }
+
+  // SCR-802: 特別永住者管理（特別永住者証明書）
+  if (req.method === "GET" && path === "/special-permanent/expiring") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const days = Number(new URL(reqUrl).searchParams.get("days") || 90);
+    const limit = Date.now() + days * 86400000;
+    const targets = state.residents
+      .filter((r) => !r.movedOutDate && r.specialPermanentCert && Date.parse(r.specialPermanentCert.expiryDate) <= limit)
+      .map((r) => ({ residentId: r.residentId, name: `${r.familyNameKanji ?? ""}${r.givenNameKanji ?? ""}`, ...r.specialPermanentCert }));
+    return json(res, 200, { days, total: targets.length, data: targets });
+  }
+  const specialPermanentMatch = path.match(/^\/residents\/([^/]+)\/special-permanent$/);
+  if (specialPermanentMatch && req.method === "GET") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const resident = state.residents.find((item) => item.residentId === specialPermanentMatch[1]);
+    if (!resident) return json(res, 404, { code: "NOT_FOUND", message: "対象住民が見つかりません。" });
+    return json(res, 200, resident.specialPermanentCert ?? null);
+  }
+  if (specialPermanentMatch && req.method === "PUT") {
+    if (!canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const resident = state.residents.find((item) => item.residentId === specialPermanentMatch[1]);
+    if (!resident) return json(res, 404, { code: "NOT_FOUND", message: "対象住民が見つかりません。" });
+    const result = updateSpecialPermanent(resident, body);
+    if (result.status === 200) audit(user, "UPDATE", "SPECIAL_PERMANENT", resident.residentId, result.body);
+    return json(res, result.status, result.body);
   }
 
   if (req.method === "POST" && path === "/transactions/in") {

@@ -356,6 +356,112 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/residents/{residentId}/special-permanent": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 特別永住者証明書の取得（SCR-802） */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["SpecialPermanentCert"];
+                    };
+                };
+            };
+        };
+        /** 特別永住者証明書の交付・更新。満了日はサーバ算出（16歳未満は16歳誕生日／以上は交付日+7年）。 */
+        put: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        certNumber: string;
+                        /** Format: date */
+                        issuedDate?: string;
+                        note?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description 交付/更新 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/special-permanent/expiring": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        /** 特別永住者証明書 有効期間満了予定一覧 */
+        get: {
+            parameters: {
+                query?: {
+                    days?: number;
+                };
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        put?: never;
+        post?: never;
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/transactions/in": {
         parameters: {
             query?: never;
@@ -2270,6 +2376,15 @@ export interface components {
         ForeignerUpdateResult: components["schemas"]["ForeignerInfo"] & {
             residentId?: string;
             expiresWithin30Days?: boolean;
+        };
+        /** @description 特別永住者証明書（SCR-802） */
+        SpecialPermanentCert: {
+            certNumber?: string;
+            /** Format: date */
+            issuedDate?: string;
+            /** Format: date */
+            expiryDate?: string;
+            note?: string;
         };
         AliasName: {
             aliasId?: string;

@@ -21,11 +21,13 @@ import { RestrictionView } from "./views/RestrictionView";
 import { NotificationView } from "./views/NotificationView";
 import { ConvenienceView } from "./views/ConvenienceView";
 import { AliasView } from "./views/AliasView";
+import { SpecialPermanentView } from "./views/SpecialPermanentView";
 
 const NAV: Array<[ViewId, string]> = [
   ["search", "住民検索"],
   ["resident", "住民票"],
   ["alias", "通称・旧氏"],
+  ["special", "特別永住者"],
   ["move", "異動"],
   ["official", "職権異動"],
   ["certificate", "証明発行"],
@@ -223,6 +225,21 @@ export function App() {
               notify("通称・旧氏を廃止しました。");
             } catch (e) {
               setNotice({ kind: "err", message: `廃止に失敗しました: ${String(e)}` });
+            }
+          }}
+        />
+      )}
+      {view === "special" && (
+        <SpecialPermanentView
+          resident={selected}
+          loadCert={(rid) => api.getSpecialPermanent(rid)}
+          loadExpiring={() => api.listSpecialPermanentExpiring(90).then((r) => r.data)}
+          onRegister={async (rid, body) => {
+            try {
+              const cert = await api.putSpecialPermanent(rid, body);
+              notify(`特別永住者証明書を登録しました。満了日: ${cert.expiryDate}`);
+            } catch (e) {
+              setNotice({ kind: "err", message: `特別永住者証明書の登録に失敗しました: ${String(e)}` });
             }
           }}
         />

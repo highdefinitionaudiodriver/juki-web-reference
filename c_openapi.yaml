@@ -131,6 +131,40 @@ paths:
       responses:
         '200': { description: 廃止 }
         '404': { description: Not found }
+  /residents/{residentId}/special-permanent:
+    get:
+      tags: [residents]
+      summary: 特別永住者証明書の取得（SCR-802）
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { $ref: '#/components/schemas/SpecialPermanentCert' } }
+    put:
+      tags: [residents]
+      summary: 特別永住者証明書の交付・更新。満了日はサーバ算出（16歳未満は16歳誕生日／以上は交付日+7年）。
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [certNumber]
+              properties:
+                certNumber: { type: string }
+                issuedDate: { type: string, format: date }
+                note: { type: string }
+      responses:
+        '200': { description: 交付/更新 }
+        '400': { description: Validation error }
+  /special-permanent/expiring:
+    get:
+      tags: [residents]
+      summary: 特別永住者証明書 有効期間満了予定一覧
+      parameters:
+        - { name: days, in: query, schema: { type: integer, default: 90 } }
+      responses:
+        '200': { description: OK }
 
   # ===== 異動 =====
   /transactions/in:
@@ -672,6 +706,14 @@ components:
             residentId: { type: string }
             expiresWithin30Days: { type: boolean }
 
+    SpecialPermanentCert:
+      type: object
+      description: 特別永住者証明書（SCR-802）
+      properties:
+        certNumber: { type: string }
+        issuedDate: { type: string, format: date }
+        expiryDate: { type: string, format: date }
+        note:       { type: string }
     AliasName:
       type: object
       properties:
