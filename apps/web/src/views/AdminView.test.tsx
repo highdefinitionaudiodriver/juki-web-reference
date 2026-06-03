@@ -63,4 +63,13 @@ describe("AdminView", () => {
     );
     expect(await screen.findByText("承認待ちの EUC 依頼はありません。")).toBeInTheDocument();
   });
+
+  it("onExportAudit 指定時に CSV出力ボタンを表示し呼び出す", async () => {
+    const onExportAudit = vi.fn();
+    render(<AdminView audit={[]} onRefresh={vi.fn()} onExportAudit={onExportAudit} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "CSV出力" }));
+    expect(onExportAudit).toHaveBeenCalledTimes(1);
+  });
+
 });

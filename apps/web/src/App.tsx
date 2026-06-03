@@ -407,6 +407,14 @@ export function App() {
         <AdminView
           audit={audit}
           onRefresh={async () => setAudit(await api.audit())}
+          onExportAudit={async () => {
+            try {
+              await api.exportAuditCsv();
+              notify("監査ログをCSV出力しました。");
+            } catch (e) {
+              setNotice({ kind: "err", message: `監査ログCSV出力に失敗しました: ${String(e)}` });
+            }
+          }}
           onEucListQueued={async () => {
             try {
               return await api.eucList("QUEUED");

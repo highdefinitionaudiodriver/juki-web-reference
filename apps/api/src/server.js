@@ -1395,6 +1395,25 @@ async function handleApi(req, res, reqUrl) {
     return json(res, 200, { rules: state.alertRules, total: alerts.length, alerts });
   }
 
+  // 監査ログCSV出力（操作ログ提出用）
+  if (req.method === "GET" && path === "/audit/export") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const cols = [["occurredAt", "日時"], ["userId", "操作者"], ["action", "操作"], ["resourceType", "対象"], ["resourceId", "対象ID"], ["details", "詳細"]];
+    const esc = (v) => {
+      const s = typeof v === "object" && v !== null ? JSON.stringify(v) : String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+    };
+    const header = cols.map(([, label]) => label).join(",");
+    const lines = state.auditLogs.map((r) => cols.map(([k]) => esc(r[k])).join(","));
+    const csv = `﻿${[header, ...lines].join("\r\n")}\r\n`;
+    res.writeHead(200, {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": 'attachment; filename="audit-log.csv"',
+      "cache-control": "no-store",
+    });
+    return res.end(csv);
+  }
+
   if (req.method === "GET" && path === "/audit") return json(res, 200, state.auditLogs.slice(0, 100));
 
   return json(res, 404, { code: "NOT_FOUND", message: "APIが見つかりません。" });

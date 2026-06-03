@@ -552,6 +552,16 @@ paths:
       tags: [admin]
       summary: アクセスログ分析アラート一覧（深夜アクセス・大量検索）
       responses: { '200': { description: OK } }
+  /audit/export:
+    get:
+      tags: [admin]
+      summary: 監査ログのCSV出力（操作ログ提出用・BOM付きUTF-8）
+      responses:
+        '200':
+          description: CSV
+          content:
+            text/csv: { schema: { type: string } }
+        '403': { description: Forbidden }
   /audit:
     get:
       tags: [admin]

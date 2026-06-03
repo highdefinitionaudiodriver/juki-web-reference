@@ -55,24 +55,28 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
   return response.status === 204 ? (null as T) : ((await response.json()) as T);
 }
 
+async function downloadCsv(path: string, filename: string, init: RequestInit): Promise<void> {
+  const headers = new Headers({ "content-type": "application/json" });
+  const token = getToken();
+  if (token) headers.set("authorization", `Bearer ${token}`);
+  const response = await fetch(`${base}${path}`, { ...init, headers });
+  if (!response.ok) throw new Error(`API error ${response.status}`);
+  const blob = await response.blob();
+  const url = URL.createObjectURL(blob);
+  const a = document.createElement("a");
+  a.href = url;
+  a.download = filename;
+  document.body.appendChild(a);
+  a.click();
+  a.remove();
+  URL.revokeObjectURL(url);
+}
+
 export const api = {
   getOverview: () => request<Overview>("/overview"),
-  async exportSearchCsv(criteria: Partial<ResidentSearchReq>): Promise<void> {
-    const headers = new Headers({ "content-type": "application/json" });
-    const token = getToken();
-    if (token) headers.set("authorization", `Bearer ${token}`);
-    const response = await fetch(`${base}/residents/search/export`, { method: "POST", headers, body: JSON.stringify(criteria) });
-    if (!response.ok) throw new Error(`API error ${response.status}`);
-    const blob = await response.blob();
-    const url = URL.createObjectURL(blob);
-    const a = document.createElement("a");
-    a.href = url;
-    a.download = "residents.csv";
-    document.body.appendChild(a);
-    a.click();
-    a.remove();
-    URL.revokeObjectURL(url);
-  },
+  exportSearchCsv: (criteria: Partial<ResidentSearchReq>) =>
+    downloadCsv("/residents/search/export", "residents.csv", { method: "POST", body: JSON.stringify(criteria) }),
+  exportAuditCsv: () => downloadCsv("/audit/export", "audit-log.csv", { method: "GET" }),
   async me(): Promise<Me> {
     try { return await request<Me>("/me"); } catch (e) {
       if (!enableFallbackData) throw e;
