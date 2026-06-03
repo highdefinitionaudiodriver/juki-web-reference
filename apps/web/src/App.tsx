@@ -125,6 +125,14 @@ export function App() {
           onChange={(next) => setCriteria(next)}
           onSearch={refreshSearch}
           onSelect={(id) => selectResident(id)}
+          onExport={async () => {
+            try {
+              await api.exportSearchCsv(criteria);
+              notify("検索結果をCSV出力しました。");
+            } catch (e) {
+              setNotice({ kind: "err", message: `CSV出力に失敗しました: ${String(e)}` });
+            }
+          }}
         />
       )}
       {view === "resident" && (

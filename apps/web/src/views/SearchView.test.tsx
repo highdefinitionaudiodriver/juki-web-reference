@@ -46,6 +46,7 @@ describe("SearchView", () => {
         onChange={vi.fn()}
         onSearch={onSearch}
         onSelect={vi.fn()}
+        onExport={vi.fn()}
       />
     );
     const user = userEvent.setup();
@@ -62,6 +63,7 @@ describe("SearchView", () => {
         onChange={vi.fn()}
         onSearch={vi.fn()}
         onSelect={onSelect}
+        onExport={vi.fn()}
       />
     );
     const user = userEvent.setup();
@@ -77,9 +79,28 @@ describe("SearchView", () => {
         onChange={vi.fn()}
         onSearch={vi.fn()}
         onSelect={vi.fn()}
+        onExport={vi.fn()}
       />
     );
     expect(screen.getByText("東京都サンプル市1-1")).toBeInTheDocument();
     expect(screen.getByText("現住")).toBeInTheDocument();
   });
+
+  it("CSV出力ボタンで onExport が呼ばれる", async () => {
+    const onExport = vi.fn();
+    render(
+      <SearchView
+        criteria={criteria}
+        residents={[]}
+        onChange={vi.fn()}
+        onSearch={vi.fn()}
+        onSelect={vi.fn()}
+        onExport={onExport}
+      />,
+    );
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "CSV出力" }));
+    expect(onExport).toHaveBeenCalledTimes(1);
+  });
+
 });

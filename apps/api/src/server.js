@@ -668,6 +668,26 @@ async function handleApi(req, res, reqUrl) {
     return json(res, 200, searchResidents(user, body));
   }
 
+  // 機能 0040079: 検索結果の CSV 出力（抑止マスク適用）
+  if (req.method === "POST" && path === "/residents/search/export") {
+    if (!canAction(user, "SEARCH")) return json(res, 403, { code: "FORBIDDEN", message: "検索権限がありません。" });
+    const body = await readBody(req);
+    const result = searchResidents(user, body);
+    const items = result.items ?? [];
+    audit(user, "EXPORT", "RESIDENT", "*", { count: items.length });
+    const cols = [["residentId", "宛名番号"], ["familyNameKanji", "氏名"], ["familyNameKana", "氏名カナ"], ["birthDate", "生年月日"], ["sex", "性別"], ["addressText", "住所"]];
+    const esc = (v) => { const s = String(v ?? ""); return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s; };
+    const header = cols.map(([, label]) => label).join(",");
+    const lines = items.map((r) => cols.map(([k]) => esc(r[k])).join(","));
+    const csv = `﻿${[header, ...lines].join("\r\n")}\r\n`;
+    res.writeHead(200, {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": 'attachment; filename="residents.csv"',
+      "cache-control": "no-store",
+    });
+    return res.end(csv);
+  }
+
   const residentMatch = path.match(/^\/residents\/([^/]+)$/);
   if (residentMatch && req.method === "GET") {
     if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });

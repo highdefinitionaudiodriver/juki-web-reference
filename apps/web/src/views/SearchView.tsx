@@ -8,9 +8,10 @@ type Props = {
   onChange: (next: SearchCriteria) => void;
   onSearch: () => void;
   onSelect: (residentId: string) => void;
+  onExport: () => void;
 };
 
-export function SearchView({ criteria, residents, onChange, onSearch, onSelect }: Props) {
+export function SearchView({ criteria, residents, onChange, onSearch, onSelect, onExport }: Props) {
   return (
     <section className="panel">
       <div className="toolbar">
@@ -33,6 +34,7 @@ export function SearchView({ criteria, residents, onChange, onSearch, onSelect }
           除票含む
         </label>
         <button className="primary" onClick={onSearch}>検索</button>
+        <button onClick={onExport}>CSV出力</button>
       </div>
       <div className="table-wrap">
         <table>

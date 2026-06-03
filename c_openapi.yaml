@@ -105,6 +105,19 @@ paths:
           description: OK
           content:
             application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Transaction' } } }
+  /residents/search/export:
+    post:
+      tags: [residents]
+      summary: 検索結果のCSV出力（機能 0040079・抑止マスク適用・BOM付きUTF-8）
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { $ref: '#/components/schemas/ResidentSearchReq' } }
+      responses:
+        '200':
+          description: CSV
+          content:
+            text/csv: { schema: { type: string } }
   /residents/{residentId}/alias:
     get:
       tags: [residents]

@@ -57,6 +57,22 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 
 export const api = {
   getOverview: () => request<Overview>("/overview"),
+  async exportSearchCsv(criteria: Partial<ResidentSearchReq>): Promise<void> {
+    const headers = new Headers({ "content-type": "application/json" });
+    const token = getToken();
+    if (token) headers.set("authorization", `Bearer ${token}`);
+    const response = await fetch(`${base}/residents/search/export`, { method: "POST", headers, body: JSON.stringify(criteria) });
+    if (!response.ok) throw new Error(`API error ${response.status}`);
+    const blob = await response.blob();
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement("a");
+    a.href = url;
+    a.download = "residents.csv";
+    document.body.appendChild(a);
+    a.click();
+    a.remove();
+    URL.revokeObjectURL(url);
+  },
   async me(): Promise<Me> {
     try { return await request<Me>("/me"); } catch (e) {
       if (!enableFallbackData) throw e;

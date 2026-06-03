@@ -255,6 +255,46 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/residents/search/export": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 検索結果のCSV出力（機能 0040079・抑止マスク適用・BOM付きUTF-8） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": components["schemas"]["ResidentSearchReq"];
+                };
+            };
+            responses: {
+                /** @description CSV */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "text/csv": string;
+                    };
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/residents/{residentId}/alias": {
         parameters: {
             query?: never;
