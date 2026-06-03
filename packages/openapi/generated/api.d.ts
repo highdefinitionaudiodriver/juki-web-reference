@@ -262,7 +262,27 @@ export interface paths {
             path?: never;
             cookie?: never;
         };
-        get?: never;
+        /** 通称・旧氏の一覧（SCR-103） */
+        get: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description OK */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content: {
+                        "application/json": components["schemas"]["AliasName"][];
+                    };
+                };
+            };
+        };
         put?: never;
         /** 通称・旧氏の登録 */
         post: {
@@ -288,6 +308,49 @@ export interface paths {
             };
         };
         delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
+    "/residents/{residentId}/alias/{aliasId}": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        post?: never;
+        /** 通称・旧氏の廃止（validTo を設定） */
+        delete: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path: {
+                    aliasId: string;
+                };
+                cookie?: never;
+            };
+            requestBody?: never;
+            responses: {
+                /** @description 廃止 */
+                200: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Not found */
+                404: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
         options?: never;
         head?: never;
         patch?: never;
@@ -2209,6 +2272,7 @@ export interface components {
             expiresWithin30Days?: boolean;
         };
         AliasName: {
+            aliasId?: string;
             /** @enum {string} */
             kind?: "ALIAS" | "FORMER_FAMILY";
             valueKanji?: string;

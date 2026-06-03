@@ -28,7 +28,17 @@ export type ForeignerExpiryReportReq = Schemas["ForeignerExpiryReportReq"];
 export type ForeignerExpiryJob = Schemas["ForeignerExpiryJob"];
 export type AliasName = Schemas["AliasName"];
 
-export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni";
+export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias";
+
+// 通称・旧氏管理（SCR-103）
+export type AliasRecord = {
+  aliasId: string;
+  kind: "ALIAS" | "FORMER_FAMILY";
+  valueKanji: string;
+  valueKana?: string;
+  validFrom: string;
+  validTo: string | null;
+};
 
 export type SearchCriteria = {
   name: string;

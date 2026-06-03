@@ -27,6 +27,7 @@ import type {
   HonninNotification,
   ConveniRequest,
   ConveniStatus,
+  AliasRecord,
 } from "./types";
 import { fallbackAuditLogs, fallbackMe, fallbackResidents, fallbackTransactions } from "./data";
 import { getToken } from "./auth";
@@ -151,6 +152,12 @@ export const api = {
   deleteNotifyRegistration: (id: string) =>
     request<null>(`/notify/registrations/${id}`, { method: "DELETE" }),
   listNotifications: () => request<HonninNotification[]>("/notify"),
+  // 通称・旧氏管理（SCR-103）
+  listAlias: (residentId: string) => request<AliasRecord[]>(`/residents/${residentId}/alias`),
+  addAlias: (residentId: string, body: { kind: "ALIAS" | "FORMER_FAMILY"; valueKanji: string; valueKana?: string }) =>
+    request<AliasRecord>(`/residents/${residentId}/alias`, { method: "POST", body: body as unknown as BodyInit }),
+  removeAlias: (residentId: string, aliasId: string) =>
+    request<AliasRecord>(`/residents/${residentId}/alias/${aliasId}`, { method: "DELETE" }),
   // コンビニ交付（SCR-507）
   conveniStatus: () => request<ConveniStatus>("/certificates/conveni/status"),
   listConveni: () => request<ConveniRequest[]>("/certificates/conveni"),

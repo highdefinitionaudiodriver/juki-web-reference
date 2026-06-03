@@ -106,6 +106,14 @@ paths:
           content:
             application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Transaction' } } }
   /residents/{residentId}/alias:
+    get:
+      tags: [residents]
+      summary: 通称・旧氏の一覧（SCR-103）
+      responses:
+        '200':
+          description: OK
+          content:
+            application/json: { schema: { type: array, items: { $ref: '#/components/schemas/AliasName' } } }
     post:
       tags: [residents]
       summary: 通称・旧氏の登録
@@ -114,6 +122,15 @@ paths:
         content:
           application/json: { schema: { $ref: '#/components/schemas/AliasName' } }
       responses: { '201': { description: Created } }
+  /residents/{residentId}/alias/{aliasId}:
+    delete:
+      tags: [residents]
+      summary: 通称・旧氏の廃止（validTo を設定）
+      parameters:
+        - { name: aliasId, in: path, required: true, schema: { type: string } }
+      responses:
+        '200': { description: 廃止 }
+        '404': { description: Not found }
 
   # ===== 異動 =====
   /transactions/in:
@@ -658,6 +675,7 @@ components:
     AliasName:
       type: object
       properties:
+        aliasId:   { type: string }
         kind:      { type: string, enum: [ALIAS, FORMER_FAMILY] }
         valueKanji: { type: string }
         valueKana: { type: string }

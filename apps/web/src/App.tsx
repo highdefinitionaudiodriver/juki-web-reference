@@ -20,10 +20,12 @@ import { AdminView } from "./views/AdminView";
 import { RestrictionView } from "./views/RestrictionView";
 import { NotificationView } from "./views/NotificationView";
 import { ConvenienceView } from "./views/ConvenienceView";
+import { AliasView } from "./views/AliasView";
 
 const NAV: Array<[ViewId, string]> = [
   ["search", "住民検索"],
   ["resident", "住民票"],
+  ["alias", "通称・旧氏"],
   ["move", "異動"],
   ["official", "職権異動"],
   ["certificate", "証明発行"],
@@ -197,6 +199,28 @@ export function App() {
             try {
               await api.deleteNotifyRegistration(registrationId);
               notify(`本人通知登録を廃止しました: ${registrationId}`);
+            } catch (e) {
+              setNotice({ kind: "err", message: `廃止に失敗しました: ${String(e)}` });
+            }
+          }}
+        />
+      )}
+      {view === "alias" && (
+        <AliasView
+          resident={selected}
+          loadAlias={(rid) => api.listAlias(rid)}
+          onAdd={async (rid, body) => {
+            try {
+              await api.addAlias(rid, body);
+              notify(`${body.kind === "ALIAS" ? "通称" : "旧氏"}を登録しました。`);
+            } catch (e) {
+              setNotice({ kind: "err", message: `通称・旧氏の登録に失敗しました: ${String(e)}` });
+            }
+          }}
+          onRemove={async (rid, aliasId) => {
+            try {
+              await api.removeAlias(rid, aliasId);
+              notify("通称・旧氏を廃止しました。");
             } catch (e) {
               setNotice({ kind: "err", message: `廃止に失敗しました: ${String(e)}` });
             }

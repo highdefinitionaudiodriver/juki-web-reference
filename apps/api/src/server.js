@@ -562,6 +562,44 @@ async function handleApi(req, res, reqUrl) {
     return json(res, result.status, result.body);
   }
 
+  // SCR-103: 通称・旧氏管理（通称=ALIAS / 旧氏=FORMER_FAMILY）
+  const aliasMatch = path.match(/^\/residents\/([^/]+)\/alias$/);
+  if (aliasMatch && req.method === "GET") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const resident = state.residents.find((item) => item.residentId === aliasMatch[1]);
+    if (!resident) return json(res, 404, { code: "NOT_FOUND", message: "対象住民が見つかりません。" });
+    return json(res, 200, resident.alias ?? []);
+  }
+  if (aliasMatch && req.method === "POST") {
+    if (!canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const resident = state.residents.find((item) => item.residentId === aliasMatch[1]);
+    if (!resident) return json(res, 404, { code: "NOT_FOUND", message: "対象住民が見つかりません。" });
+    if (!body.valueKanji) return json(res, 400, { code: "VALIDATION_ERROR", message: "valueKanji は必須です。" });
+    const alias = {
+      aliasId: `AL-${Date.now()}`,
+      kind: body.kind === "FORMER_FAMILY" ? "FORMER_FAMILY" : "ALIAS",
+      valueKanji: body.valueKanji,
+      valueKana: body.valueKana || "",
+      validFrom: body.validFrom || new Date().toISOString().slice(0, 10),
+      validTo: null,
+    };
+    resident.alias = [alias, ...(resident.alias ?? [])];
+    audit(user, "CREATE", "ALIAS", resident.residentId, { kind: alias.kind, valueKanji: alias.valueKanji });
+    return json(res, 201, alias);
+  }
+  const aliasDeleteMatch = path.match(/^\/residents\/([^/]+)\/alias\/([^/]+)$/);
+  if (aliasDeleteMatch && req.method === "DELETE") {
+    if (!canAction(user, "TRANSACTION")) return json(res, 403, { code: "FORBIDDEN" });
+    const resident = state.residents.find((item) => item.residentId === aliasDeleteMatch[1]);
+    if (!resident) return json(res, 404, { code: "NOT_FOUND" });
+    const target = (resident.alias ?? []).find((a) => a.aliasId === aliasDeleteMatch[2]);
+    if (!target) return json(res, 404, { code: "NOT_FOUND", message: "通称・旧氏が見つかりません。" });
+    target.validTo = new Date().toISOString().slice(0, 10);
+    audit(user, "UPDATE", "ALIAS", resident.residentId, { aliasId: target.aliasId, action: "廃止" });
+    return json(res, 200, target);
+  }
+
   if (req.method === "POST" && path === "/transactions/in") {
     if (!canAction(user, "MOVE_IN_APPLY") && !canAction(user, "MOVE_IN_RECEIVE") && !canAction(user, "TRANSACTION")) {
       return json(res, 403, { code: "FORBIDDEN" });
