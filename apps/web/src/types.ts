@@ -28,7 +28,20 @@ export type ForeignerExpiryReportReq = Schemas["ForeignerExpiryReportReq"];
 export type ForeignerExpiryJob = Schemas["ForeignerExpiryJob"];
 export type AliasName = Schemas["AliasName"];
 
-export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts" | "eucdesign" | "batch";
+export type ViewId = "overview" | "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts" | "eucdesign" | "batch";
+
+// ダッシュボード（SCR-002）
+export type Overview = {
+  residents: { total: number; active: number; foreigners: number; specialPermanent: number; restricted: number };
+  transactions: { total: number; pendingApproval: number };
+  certificates: number;
+  conveniRequests: number;
+  notifyRegistrations: number;
+  notifications: number;
+  eucTemplates: number;
+  batchJobs: number;
+  alerts: number;
+};
 
 // バッチ管理（標準仕様書 9）
 export type BatchType = { type: string; name: string; description: string };

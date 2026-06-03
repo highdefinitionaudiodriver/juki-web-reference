@@ -34,6 +34,7 @@ import type {
   EucTemplate,
   BatchType,
   BatchJob,
+  Overview,
 } from "./types";
 import { fallbackAuditLogs, fallbackMe, fallbackResidents, fallbackTransactions } from "./data";
 import { getToken } from "./auth";
@@ -55,6 +56,7 @@ async function request<T>(path: string, init: RequestInit = {}): Promise<T> {
 }
 
 export const api = {
+  getOverview: () => request<Overview>("/overview"),
   async me(): Promise<Me> {
     try { return await request<Me>("/me"); } catch (e) {
       if (!enableFallbackData) throw e;

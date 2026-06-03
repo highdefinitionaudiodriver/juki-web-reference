@@ -25,8 +25,10 @@ import { SpecialPermanentView } from "./views/SpecialPermanentView";
 import { AlertSettingsView } from "./views/AlertSettingsView";
 import { EucDesignView } from "./views/EucDesignView";
 import { BatchView } from "./views/BatchView";
+import { OverviewView } from "./views/OverviewView";
 
 const NAV: Array<[ViewId, string]> = [
+  ["overview", "ダッシュボード"],
   ["search", "住民検索"],
   ["resident", "住民票"],
   ["alias", "通称・旧氏"],
@@ -113,6 +115,9 @@ export function App() {
         setNotice({ kind: "info", message: "ログアウトしました。" });
       }}
     >
+      {view === "overview" && (
+        <OverviewView load={() => api.getOverview()} onNavigate={setView} />
+      )}
       {view === "search" && (
         <SearchView
           criteria={criteria}

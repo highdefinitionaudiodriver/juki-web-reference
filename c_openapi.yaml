@@ -469,6 +469,11 @@ paths:
     post: { tags: [admin], summary: ロール作成, responses: { '201': { description: Created } } }
   /admin/permissions:
     post: { tags: [admin], summary: 権限マトリクス更新, responses: { '200': { description: OK } } }
+  /overview:
+    get:
+      tags: [admin]
+      summary: ダッシュボード 主要指標の集約（SCR-002）
+      responses: { '200': { description: OK } }
   /batch-jobs:
     get:
       tags: [admin]

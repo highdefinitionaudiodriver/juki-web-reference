@@ -610,6 +610,32 @@ async function handleApi(req, res, reqUrl) {
   if (req.method === "POST" && path === "/auth/logout") { res.writeHead(204); return res.end(); }
   if (req.method === "GET" && path === "/me") return json(res, 200, user);
 
+  // SCR-002: ダッシュボード（主要指標の集約）
+  if (req.method === "GET" && path === "/overview") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const active = state.residents.filter((r) => !r.movedOutDate);
+    return json(res, 200, {
+      residents: {
+        total: state.residents.length,
+        active: active.length,
+        foreigners: active.filter((r) => r.foreigner).length,
+        specialPermanent: state.residents.filter((r) => r.specialPermanentCert).length,
+        restricted: state.residents.filter((r) => r.restrictions?.length).length,
+      },
+      transactions: {
+        total: state.transactions.length,
+        pendingApproval: state.transactions.filter((t) => t.status && t.status !== "APPLIED").length,
+      },
+      certificates: state.certificates.length,
+      conveniRequests: state.conveniRequests.length,
+      notifyRegistrations: state.notifyRegistrations.filter((r) => r.status === "ACTIVE").length,
+      notifications: state.notifications.length,
+      eucTemplates: state.eucTemplates.length,
+      batchJobs: state.batchJobs.length,
+      alerts: analyzeAlerts(state.alertRules, state.auditLogs).length,
+    });
+  }
+
   if (req.method === "POST" && path === "/auth/webauthn/challenge") {
     const body = await readBody(req);
     return json(res, 200, newWebAuthnChallenge(body.userId || user.userId));

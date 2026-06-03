@@ -62,3 +62,12 @@ tbody tr:hover{background:#f8fbfd}
 .paper h2{text-align:center;font-size:22px;margin-bottom:30px}
 .empty{min-height:180px;display:grid;place-items:center;color:var(--muted)}
 @media(max-width:900px){.shell{grid-template-columns:1fr}.side{position:static}nav{grid-template-columns:repeat(2,minmax(0,1fr))}.grid.two{grid-template-columns:1fr}.topbar{display:grid}}
+
+/* SCR-002 ダッシュボード */
+.card-grid { display: grid; grid-template-columns: repeat(auto-fill, minmax(150px, 1fr)); gap: 12px; }
+.stat-card { display: flex; flex-direction: column; align-items: flex-start; gap: 4px; padding: 14px 16px; border: 1px solid var(--border, #d0d7de); border-radius: 10px; background: var(--panel, #fff); cursor: pointer; text-align: left; transition: box-shadow .12s, transform .12s; }
+.stat-card:hover:not(:disabled) { box-shadow: 0 2px 8px rgba(0,0,0,.12); transform: translateY(-1px); }
+.stat-card:disabled { cursor: default; opacity: .7; }
+.stat-card.warn { border-color: #e6a23c; background: #fff8ec; }
+.stat-value { font-size: 1.7rem; font-weight: 700; line-height: 1.1; }
+.stat-label { font-size: .82rem; color: var(--muted, #57606a); }
