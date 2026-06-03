@@ -29,6 +29,8 @@ import type {
   ConveniStatus,
   AliasRecord,
   SpecialPermanentCert,
+  AlertRules,
+  AlertItem,
 } from "./types";
 import { fallbackAuditLogs, fallbackMe, fallbackResidents, fallbackTransactions } from "./data";
 import { getToken } from "./auth";
@@ -168,6 +170,11 @@ export const api = {
   listSpecialPermanentExpiring: (days = 90) =>
     request<{ days: number; total: number; data: Array<SpecialPermanentCert & { residentId: string; name: string }> }>(
       `/special-permanent/expiring?days=${days}`),
+  // エラー・アラート設定 / アクセスログ分析（SCR-A04）
+  getAlertRules: () => request<AlertRules>("/alert-rules"),
+  putAlertRules: (body: Partial<AlertRules>) =>
+    request<AlertRules>("/alert-rules", { method: "PUT", body: body as unknown as BodyInit }),
+  getAlerts: () => request<{ rules: AlertRules; total: number; alerts: AlertItem[] }>("/alerts"),
   // コンビニ交付（SCR-507）
   conveniStatus: () => request<ConveniStatus>("/certificates/conveni/status"),
   listConveni: () => request<ConveniRequest[]>("/certificates/conveni"),

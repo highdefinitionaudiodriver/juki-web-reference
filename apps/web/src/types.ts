@@ -28,7 +28,24 @@ export type ForeignerExpiryReportReq = Schemas["ForeignerExpiryReportReq"];
 export type ForeignerExpiryJob = Schemas["ForeignerExpiryJob"];
 export type AliasName = Schemas["AliasName"];
 
-export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special";
+export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts";
+
+// エラー・アラート設定 / アクセスログ分析（SCR-A04）
+export type AlertRules = {
+  nightAccessEnabled: boolean;
+  nightStartHour: number;
+  nightEndHour: number;
+  bulkSearchEnabled: boolean;
+  bulkSearchThreshold: number;
+};
+export type AlertItem = {
+  type: "NIGHT_ACCESS" | "BULK_SEARCH";
+  severity: string;
+  userId: string;
+  message: string;
+  occurredAt?: string;
+  count?: number;
+};
 
 // 特別永住者証明書（SCR-802）
 export type SpecialPermanentCert = {

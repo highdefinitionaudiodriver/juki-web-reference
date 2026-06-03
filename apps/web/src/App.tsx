@@ -22,6 +22,7 @@ import { NotificationView } from "./views/NotificationView";
 import { ConvenienceView } from "./views/ConvenienceView";
 import { AliasView } from "./views/AliasView";
 import { SpecialPermanentView } from "./views/SpecialPermanentView";
+import { AlertSettingsView } from "./views/AlertSettingsView";
 
 const NAV: Array<[ViewId, string]> = [
   ["search", "住民検索"],
@@ -35,6 +36,7 @@ const NAV: Array<[ViewId, string]> = [
   ["notify", "本人通知"],
   ["conveni", "コンビニ交付"],
   ["reports", "統計/EUC"],
+  ["alerts", "アラート設定"],
   ["admin", "権限/監査"],
 ];
 
@@ -259,6 +261,20 @@ export function App() {
               );
             } catch (e) {
               setNotice({ kind: "err", message: `コンビニ交付要求に失敗しました: ${String(e)}` });
+            }
+          }}
+        />
+      )}
+      {view === "alerts" && (
+        <AlertSettingsView
+          loadRules={() => api.getAlertRules()}
+          loadAlerts={() => api.getAlerts()}
+          onSave={async (rules) => {
+            try {
+              await api.putAlertRules(rules);
+              notify("アラート検知ルールを保存しました。");
+            } catch (e) {
+              setNotice({ kind: "err", message: `保存に失敗しました: ${String(e)}` });
             }
           }}
         />

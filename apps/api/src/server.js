@@ -23,7 +23,45 @@ const state = {
   notifications: [],
   // コンビニ交付（J-LIS / 自治体中間サーバ連携, SCR-507）
   conveniRequests: [],
+  // エラー・アラート設定 / アクセスログ分析（SCR-A04 / 標準仕様書 11, BAT-011）
+  alertRules: {
+    nightAccessEnabled: true,
+    nightStartHour: 22,
+    nightEndHour: 6,
+    bulkSearchEnabled: true,
+    bulkSearchThreshold: 50,
+  },
 };
+
+// SCR-A04: アクセスログ分析。監査ログから深夜アクセス・大量検索を抽出してアラート化。
+function analyzeAlerts(rules, logs) {
+  const alerts = [];
+  if (rules.nightAccessEnabled) {
+    for (const log of logs) {
+      const hour = new Date(log.occurredAt).getHours();
+      const isNight = rules.nightStartHour > rules.nightEndHour
+        ? (hour >= rules.nightStartHour || hour < rules.nightEndHour)
+        : (hour >= rules.nightStartHour && hour < rules.nightEndHour);
+      if (isNight) {
+        alerts.push({ type: "NIGHT_ACCESS", severity: "WARN", userId: log.userId, occurredAt: log.occurredAt,
+          message: `深夜時間帯(${rules.nightStartHour}時〜${rules.nightEndHour}時)のアクセス: ${log.action} ${log.resourceType ?? ""}` });
+      }
+    }
+  }
+  if (rules.bulkSearchEnabled) {
+    const counts = {};
+    for (const log of logs) {
+      if (log.action === "SEARCH" || log.action === "VIEW") counts[log.userId] = (counts[log.userId] || 0) + 1;
+    }
+    for (const [userId, count] of Object.entries(counts)) {
+      if (count > rules.bulkSearchThreshold) {
+        alerts.push({ type: "BULK_SEARCH", severity: "WARN", userId, count,
+          message: `大量検索の疑い: ${userId} が ${count} 件(閾値 ${rules.bulkSearchThreshold})の検索・照会を実施` });
+      }
+    }
+  }
+  return alerts;
+}
 
 const mime = {
   ".html": "text/html; charset=utf-8",
@@ -1135,6 +1173,27 @@ async function handleApi(req, res, reqUrl) {
     audit(user, "RECEIVE", "CONVENI_CERTIFICATE", record.conveniId, { residentId: body.residentId, status: record.status });
     const status = record.status === "ISSUED" ? 201 : record.status === "NOT_FOUND" ? 404 : 200;
     return json(res, status, record);
+  }
+
+  // SCR-A04: エラー・アラート設定 / アクセスログ分析
+  if (req.method === "GET" && path === "/alert-rules") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, state.alertRules);
+  }
+  if (req.method === "PUT" && path === "/alert-rules") {
+    if (!canAction(user, "RESTRICTION_MANAGE") && !user.roles?.includes("ADMIN")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const next = { ...state.alertRules };
+    for (const k of ["nightAccessEnabled", "bulkSearchEnabled"]) if (typeof body[k] === "boolean") next[k] = body[k];
+    for (const k of ["nightStartHour", "nightEndHour", "bulkSearchThreshold"]) if (Number.isFinite(Number(body[k]))) next[k] = Number(body[k]);
+    state.alertRules = next;
+    audit(user, "UPDATE", "ALERT_RULES", "*", next);
+    return json(res, 200, next);
+  }
+  if (req.method === "GET" && path === "/alerts") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const alerts = analyzeAlerts(state.alertRules, state.auditLogs);
+    return json(res, 200, { rules: state.alertRules, total: alerts.length, alerts });
   }
 
   if (req.method === "GET" && path === "/audit") return json(res, 200, state.auditLogs.slice(0, 100));

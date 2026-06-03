@@ -469,6 +469,20 @@ paths:
     post: { tags: [admin], summary: ロール作成, responses: { '201': { description: Created } } }
   /admin/permissions:
     post: { tags: [admin], summary: 権限マトリクス更新, responses: { '200': { description: OK } } }
+  /alert-rules:
+    get:
+      tags: [admin]
+      summary: エラー・アラート検知ルール取得（SCR-A04）
+      responses: { '200': { description: OK } }
+    put:
+      tags: [admin]
+      summary: アラート検知ルール更新（ADMIN/RESTRICTION_MANAGE）
+      responses: { '200': { description: Updated }, '403': { description: Forbidden } }
+  /alerts:
+    get:
+      tags: [admin]
+      summary: アクセスログ分析アラート一覧（深夜アクセス・大量検索）
+      responses: { '200': { description: OK } }
   /audit:
     get:
       tags: [admin]
