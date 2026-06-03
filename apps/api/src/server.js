@@ -1198,6 +1198,30 @@ async function handleApi(req, res, reqUrl) {
     res.writeHead(204); return res.end();
   }
 
+  // SCR-A01 → EUC実行: 保存テンプレートからEUC抽出を実行（機微情報含むと二人承認）
+  const eucTemplateRunMatch = path.match(/^\/euc-templates\/([^/]+)\/run$/);
+  if (eucTemplateRunMatch && req.method === "POST") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const tpl = state.eucTemplates.find((t) => t.id === eucTemplateRunMatch[1]);
+    if (!tpl) return json(res, 404, { code: "NOT_FOUND", message: "テンプレートが見つかりません。" });
+    const needsApproval = Boolean(tpl.requiresSecondApproval);
+    const rows = state.residents.filter((r) => !r.movedOutDate).length;
+    audit(user, "EXECUTE", "EUC_TEMPLATE", tpl.id, { name: tpl.name, needsApproval, rows });
+    return json(res, 202, {
+      jobId: `EUC-${Date.now()}`,
+      templateId: tpl.id,
+      templateName: tpl.name,
+      outputFields: tpl.outputFields,
+      estimatedRows: rows,
+      status: needsApproval ? "QUEUED" : "DONE",
+      requiresSecondApproval: needsApproval,
+      requiredApprovals: needsApproval ? 2 : 1,
+      approvedCount: 0,
+      resultUrl: needsApproval ? null : `/euc/result.csv`,
+      error: null,
+    });
+  }
+
   // バッチ管理（標準仕様書 9 バッチ / BAT-001〜）: 定義一覧・実行・履歴
   if (req.method === "GET" && path === "/batch-jobs") {
     if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });

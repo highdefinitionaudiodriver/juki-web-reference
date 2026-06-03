@@ -6,6 +6,7 @@ type Props = {
   loadTemplates: () => Promise<EucTemplate[]>;
   onCreate: (body: { name: string; domain: string; outputFields: string[]; includeMyNumber: boolean }) => Promise<void>;
   onDelete: (id: string) => Promise<void>;
+  onRun: (id: string) => Promise<void>;
 };
 
 const FIELD_OPTIONS = [
@@ -24,7 +25,7 @@ const FIELD_OPTIONS = [
  *  - 抽出対象ドメイン・出力項目を定義したテンプレートを登録・管理する。
  *  - 個人番号など機微情報を含む抽出は二人承認が必要（実行時 /euc/query と整合）。
  */
-export function EucDesignView({ loadTemplates, onCreate, onDelete }: Props) {
+export function EucDesignView({ loadTemplates, onCreate, onDelete, onRun }: Props) {
   const [templates, setTemplates] = useState<EucTemplate[]>([]);
   const [name, setName] = useState("");
   const [domain, setDomain] = useState("RESIDENT");
@@ -82,7 +83,7 @@ export function EucDesignView({ loadTemplates, onCreate, onDelete }: Props) {
           <div className="table-wrap">
             <table>
               <thead>
-                <tr><th>名称</th><th>ドメイン</th><th>項目数</th><th>承認</th><th></th></tr>
+                <tr><th>名称</th><th>ドメイン</th><th>項目数</th><th>承認</th><th></th><th></th></tr>
               </thead>
               <tbody>
                 {templates.map((t) => (
@@ -91,6 +92,7 @@ export function EucDesignView({ loadTemplates, onCreate, onDelete }: Props) {
                     <td>{t.domain}</td>
                     <td>{t.outputFields.length}</td>
                     <td>{t.requiresSecondApproval ? <span className="badge warn">二人承認</span> : <span className="badge ok">単独</span>}</td>
+                    <td><button onClick={() => onRun(t.id)}>実行</button></td>
                     <td><button className="danger" onClick={async () => { await onDelete(t.id); await refresh(); }}>削除</button></td>
                   </tr>
                 ))}

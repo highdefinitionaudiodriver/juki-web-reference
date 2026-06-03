@@ -306,6 +306,18 @@ export function App() {
               setNotice({ kind: "err", message: `削除に失敗しました: ${String(e)}` });
             }
           }}
+          onRun={async (id) => {
+            try {
+              const job = await api.runEucTemplate(id);
+              notify(
+                job.requiresSecondApproval
+                  ? `EUC実行を保留しました。二人承認が必要です: ${job.jobId}（対象${job.estimatedRows}件）`
+                  : `EUC抽出を実行しました: ${job.resultUrl}（対象${job.estimatedRows}件）`,
+              );
+            } catch (e) {
+              setNotice({ kind: "err", message: `EUC実行に失敗しました: ${String(e)}` });
+            }
+          }}
         />
       )}
       {view === "alerts" && (

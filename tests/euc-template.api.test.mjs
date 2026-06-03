@@ -41,6 +41,23 @@ test("EUC設計 (SCR-A01): テンプレート作成・機微情報は二人承�
   assert.equal(list.status, 200);
   assert.ok(list.body.length >= 2);
 
+  // 実行(機微情報なし) → 二人承認不要で DONE
+  const run1 = await call("POST", `/euc-templates/${t1.body.id}/run`);
+  assert.equal(run1.status, 202);
+  assert.equal(run1.body.status, "DONE");
+  assert.equal(run1.body.requiresSecondApproval, false);
+  assert.ok(run1.body.resultUrl);
+
+  // 実行(個人番号含む) → 二人承認が必要で QUEUED
+  const run2 = await call("POST", `/euc-templates/${t2.body.id}/run`);
+  assert.equal(run2.body.status, "QUEUED");
+  assert.equal(run2.body.requiresSecondApproval, true);
+  assert.equal(run2.body.resultUrl, null);
+
+  // 存在しないテンプレート実行は 404
+  const runNf = await call("POST", "/euc-templates/NOPE/run");
+  assert.equal(runNf.status, 404);
+
   // 削除
   const del = await call("DELETE", `/euc-templates/${t1.body.id}`);
   assert.equal(del.status, 204);

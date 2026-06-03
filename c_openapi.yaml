@@ -495,6 +495,13 @@ paths:
       tags: [admin]
       summary: EUC抽出テンプレート作成。個人番号含む場合は二人承認フラグを付与。
       responses: { '201': { description: Created }, '400': { description: Validation error } }
+  /euc-templates/{id}/run:
+    post:
+      tags: [admin]
+      summary: 保存テンプレートからEUC抽出を実行。機微情報含むと二人承認(QUEUED)。
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { '202': { description: Accepted }, '404': { description: Not found } }
   /euc-templates/{id}:
     delete:
       tags: [admin]

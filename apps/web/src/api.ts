@@ -185,6 +185,9 @@ export const api = {
   createEucTemplate: (body: { name: string; domain?: string; outputFields: string[]; includeMyNumber?: boolean }) =>
     request<EucTemplate>("/euc-templates", { method: "POST", body: body as unknown as BodyInit }),
   deleteEucTemplate: (id: string) => request<null>(`/euc-templates/${id}`, { method: "DELETE" }),
+  runEucTemplate: (id: string) =>
+    request<{ jobId: string; templateName: string; status: string; requiresSecondApproval: boolean; estimatedRows: number; resultUrl: string | null }>(
+      `/euc-templates/${id}/run`, { method: "POST" }),
   // バッチ管理（標準仕様書 9）
   listBatchJobs: () => request<{ types: BatchType[]; history: BatchJob[] }>("/batch-jobs"),
   runBatch: (type: string) => request<BatchJob>(`/batch-jobs/${type}/run`, { method: "POST" }),
