@@ -23,6 +23,7 @@ import { ConvenienceView } from "./views/ConvenienceView";
 import { AliasView } from "./views/AliasView";
 import { SpecialPermanentView } from "./views/SpecialPermanentView";
 import { AlertSettingsView } from "./views/AlertSettingsView";
+import { EucDesignView } from "./views/EucDesignView";
 
 const NAV: Array<[ViewId, string]> = [
   ["search", "住民検索"],
@@ -36,6 +37,7 @@ const NAV: Array<[ViewId, string]> = [
   ["notify", "本人通知"],
   ["conveni", "コンビニ交付"],
   ["reports", "統計/EUC"],
+  ["eucdesign", "EUC設計"],
   ["alerts", "アラート設定"],
   ["admin", "権限/監査"],
 ];
@@ -261,6 +263,27 @@ export function App() {
               );
             } catch (e) {
               setNotice({ kind: "err", message: `コンビニ交付要求に失敗しました: ${String(e)}` });
+            }
+          }}
+        />
+      )}
+      {view === "eucdesign" && (
+        <EucDesignView
+          loadTemplates={() => api.listEucTemplates()}
+          onCreate={async (body) => {
+            try {
+              const t = await api.createEucTemplate(body);
+              notify(`EUCテンプレート「${t.name}」を保存しました${t.requiresSecondApproval ? "（実行時は二人承認）" : ""}。`);
+            } catch (e) {
+              setNotice({ kind: "err", message: `EUCテンプレートの保存に失敗しました: ${String(e)}` });
+            }
+          }}
+          onDelete={async (id) => {
+            try {
+              await api.deleteEucTemplate(id);
+              notify("EUCテンプレートを削除しました。");
+            } catch (e) {
+              setNotice({ kind: "err", message: `削除に失敗しました: ${String(e)}` });
             }
           }}
         />

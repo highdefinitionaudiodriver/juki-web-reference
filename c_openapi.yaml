@@ -469,6 +469,22 @@ paths:
     post: { tags: [admin], summary: ロール作成, responses: { '201': { description: Created } } }
   /admin/permissions:
     post: { tags: [admin], summary: 権限マトリクス更新, responses: { '200': { description: OK } } }
+  /euc-templates:
+    get:
+      tags: [admin]
+      summary: EUC抽出テンプレート一覧（SCR-A01）
+      responses: { '200': { description: OK } }
+    post:
+      tags: [admin]
+      summary: EUC抽出テンプレート作成。個人番号含む場合は二人承認フラグを付与。
+      responses: { '201': { description: Created }, '400': { description: Validation error } }
+  /euc-templates/{id}:
+    delete:
+      tags: [admin]
+      summary: EUC抽出テンプレート削除
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { '204': { description: Deleted }, '404': { description: Not found } }
   /alert-rules:
     get:
       tags: [admin]

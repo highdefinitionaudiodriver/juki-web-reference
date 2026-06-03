@@ -23,6 +23,8 @@ const state = {
   notifications: [],
   // コンビニ交付（J-LIS / 自治体中間サーバ連携, SCR-507）
   conveniRequests: [],
+  // EUC設計（SCR-A01 / BAT-012 EUCデータ抽出）: 再利用可能な抽出テンプレート
+  eucTemplates: [],
   // エラー・アラート設定 / アクセスログ分析（SCR-A04 / 標準仕様書 11, BAT-011）
   alertRules: {
     nightAccessEnabled: true,
@@ -1072,6 +1074,43 @@ async function handleApi(req, res, reqUrl) {
       requiredApprovals: 2,
       approvedCount: isReject ? 0 : 2,
     });
+  }
+
+  // SCR-A01: EUC設計（再利用可能な抽出テンプレート）
+  if (req.method === "GET" && path === "/euc-templates") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, state.eucTemplates);
+  }
+  if (req.method === "POST" && path === "/euc-templates") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    if (!body.name || !Array.isArray(body.outputFields) || body.outputFields.length === 0) {
+      return json(res, 400, { code: "VALIDATION_ERROR", message: "name と outputFields(1件以上) は必須です。" });
+    }
+    const includeMyNumber = Boolean(body.includeMyNumber) || body.outputFields.includes("myNumber");
+    const template = {
+      id: `EUCT-${Date.now()}`,
+      name: body.name,
+      domain: body.domain || "RESIDENT",
+      outputFields: body.outputFields,
+      includeMyNumber,
+      // 機微情報を含む抽出は二人承認が必要（/euc/query と整合）
+      requiresSecondApproval: includeMyNumber,
+      createdBy: user.userId,
+      createdAt: new Date().toISOString(),
+    };
+    state.eucTemplates.unshift(template);
+    audit(user, "CREATE", "EUC_TEMPLATE", template.id, { name: template.name, includeMyNumber });
+    return json(res, 201, template);
+  }
+  const eucTemplateMatch = path.match(/^\/euc-templates\/([^/]+)$/);
+  if (eucTemplateMatch && req.method === "DELETE") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const before = state.eucTemplates.length;
+    state.eucTemplates = state.eucTemplates.filter((t) => t.id !== eucTemplateMatch[1]);
+    if (state.eucTemplates.length === before) return json(res, 404, { code: "NOT_FOUND" });
+    audit(user, "DELETE", "EUC_TEMPLATE", eucTemplateMatch[1], {});
+    res.writeHead(204); return res.end();
   }
 
   if (req.method === "POST" && path === "/restrictions") {

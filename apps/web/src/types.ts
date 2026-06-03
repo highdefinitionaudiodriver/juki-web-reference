@@ -28,7 +28,19 @@ export type ForeignerExpiryReportReq = Schemas["ForeignerExpiryReportReq"];
 export type ForeignerExpiryJob = Schemas["ForeignerExpiryJob"];
 export type AliasName = Schemas["AliasName"];
 
-export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts";
+export type ViewId = "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts" | "eucdesign";
+
+// EUC設計（SCR-A01）
+export type EucTemplate = {
+  id: string;
+  name: string;
+  domain: string;
+  outputFields: string[];
+  includeMyNumber: boolean;
+  requiresSecondApproval: boolean;
+  createdBy?: string;
+  createdAt?: string;
+};
 
 // エラー・アラート設定 / アクセスログ分析（SCR-A04）
 export type AlertRules = {
