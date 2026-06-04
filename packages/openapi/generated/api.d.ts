@@ -1045,6 +1045,55 @@ export interface paths {
         patch?: never;
         trace?: never;
     };
+    "/certificates/bulk": {
+        parameters: {
+            query?: never;
+            header?: never;
+            path?: never;
+            cookie?: never;
+        };
+        get?: never;
+        put?: never;
+        /** 証明書の連件交付（複数宛名番号へ一括発行） */
+        post: {
+            parameters: {
+                query?: never;
+                header?: never;
+                path?: never;
+                cookie?: never;
+            };
+            requestBody: {
+                content: {
+                    "application/json": {
+                        residentIds: string[];
+                        formId?: string;
+                        usageText?: string;
+                    };
+                };
+            };
+            responses: {
+                /** @description 一括発行結果(issued/skipped) */
+                201: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+                /** @description Validation error */
+                400: {
+                    headers: {
+                        [name: string]: unknown;
+                    };
+                    content?: never;
+                };
+            };
+        };
+        delete?: never;
+        options?: never;
+        head?: never;
+        patch?: never;
+        trace?: never;
+    };
     "/certificates/jumin": {
         parameters: {
             query?: never;

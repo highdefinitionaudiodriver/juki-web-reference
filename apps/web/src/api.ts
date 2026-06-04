@@ -128,6 +128,9 @@ export const api = {
   issueJuminCode: (body: JuminCodeReq) => request<CodeIssueResult>("/codes/jumin", { method: "POST", body: body as unknown as BodyInit }),
   issueMyNumber: (body: MyNumberReq) => request<CodeIssueResult>("/codes/mynumber", { method: "POST", body: body as unknown as BodyInit }),
   issueCertificate: (body: CertificateReq) => request<CertificateIssue>("/certificates/jumin", { method: "POST", body: body as unknown as BodyInit }),
+  issueCertificatesBulk: (residentIds: string[], formId: string) =>
+    request<{ formId: string; issuedCount: number; totalFee: number; issued: unknown[]; skipped: unknown[] }>(
+      "/certificates/bulk", { method: "POST", body: { residentIds, formId } as unknown as BodyInit }),
   updateForeigner: (residentId: string, body: ForeignerInfo) =>
     request<ForeignerUpdateResult>(`/residents/${residentId}/foreigner`, { method: "PUT", body: body as unknown as BodyInit }),
   annualReport: (body: ReportReq) => request<AsyncJob>("/reports/annual", { method: "POST", body: body as unknown as BodyInit }),

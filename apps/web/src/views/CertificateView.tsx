@@ -6,9 +6,11 @@ import { CertificateTemplate } from "../print/CertificateTemplate";
 type Props = {
   resident: Resident | null;
   onIssue: (req: CertificateReq) => Promise<CertificateIssue | void>;
+  /** 連件交付（複数宛名番号への一括発行）。指定があれば連件交付パネルを表示。 */
+  onBulkIssue?: (residentIds: string[], formId: string) => Promise<void>;
 };
 
-export function CertificateView({ resident, onIssue }: Props) {
+export function CertificateView({ resident, onIssue, onBulkIssue }: Props) {
   const [formId, setFormId] = useState("0010001");
   const [scope, setScope] = useState<"SELF" | "HOUSEHOLD" | "MEMBERS">("SELF");
   const [copies, setCopies] = useState("1");
@@ -16,6 +18,7 @@ export function CertificateView({ resident, onIssue }: Props) {
   const [showJuminCode, setShowJuminCode] = useState(false);
   const [showMyNumber, setShowMyNumber] = useState(false);
   const [issued, setIssued] = useState<CertificateIssue | null>(null);
+  const [bulkIds, setBulkIds] = useState("");
 
   if (!resident) {
     return <section className="panel empty">証明発行対象を選択してください。</section>;
@@ -122,6 +125,29 @@ export function CertificateView({ resident, onIssue }: Props) {
           showJuminCode={showJuminCode}
           showMyNumber={showMyNumber}
         />
+        {onBulkIssue && (
+          <form
+            className="stack"
+            style={{ marginTop: 16 }}
+            onSubmit={async (e) => {
+              e.preventDefault();
+              const ids = bulkIds.split(/[\s,]+/).map((s) => s.trim()).filter(Boolean);
+              if (ids.length === 0) return;
+              await onBulkIssue(ids, formId);
+              setBulkIds("");
+            }}
+          >
+            <h3>連件交付（複数宛名番号へ一括発行）</h3>
+            <textarea
+              aria-label="宛名番号一覧"
+              rows={3}
+              value={bulkIds}
+              onChange={(e) => setBulkIds(e.target.value)}
+              placeholder="宛名番号を改行またはカンマ区切りで入力"
+            />
+            <button>連件交付</button>
+          </form>
+        )}
       </section>
     </div>
   );

@@ -202,6 +202,14 @@ export function App() {
             notify(`証明書を発行しました。検証トークン: ${issue.verifyToken} / 手数料: ${issue.fee}円`);
             return issue;
           }}
+          onBulkIssue={async (residentIds, formId) => {
+            try {
+              const r = await api.issueCertificatesBulk(residentIds, formId);
+              notify(`連件交付: ${r.issuedCount}件発行（手数料合計 ${r.totalFee}円 / 対象外 ${r.skipped.length}件）`);
+            } catch (e) {
+              setNotice({ kind: "err", message: `連件交付に失敗しました: ${String(e)}` });
+            }
+          }}
         />
       )}
       {view === "notify" && (

@@ -108,4 +108,14 @@ describe("CertificateView", () => {
     expect(print).toHaveBeenCalled();
     print.mockRestore();
   });
+
+  it("連件交付パネルで複数宛名番号を渡して onBulkIssue が呼ばれる", async () => {
+    const onBulkIssue = vi.fn().mockResolvedValue(undefined);
+    render(<CertificateView resident={resident} onIssue={vi.fn()} onBulkIssue={onBulkIssue} />);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("宛名番号一覧"), "R-001, R-002, R-003");
+    await user.click(screen.getByRole("button", { name: "連件交付" }));
+    expect(onBulkIssue).toHaveBeenCalledWith(["R-001", "R-002", "R-003"], "0010001");
+  });
+
 });

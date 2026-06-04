@@ -1019,6 +1019,25 @@ async function handleApi(req, res, reqUrl) {
     return json(res, 201, { ...issue, honninTsuchi: notification });
   }
 
+  // 連件交付: 複数住民への証明書一括発行（機能 0040124 一括入力相当）
+  if (req.method === "POST" && path === "/certificates/bulk") {
+    if (!canAction(user, "ISSUE_CERTIFICATE")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const ids = Array.isArray(body.residentIds) ? body.residentIds : [];
+    if (ids.length === 0) return json(res, 400, { code: "VALIDATION_ERROR", message: "residentIds(1件以上)は必須です。" });
+    const formId = body.formId || "0010001";
+    const issued = [];
+    const skipped = [];
+    for (const rid of ids) {
+      const resident = state.residents.find((r) => r.residentId === rid && !r.movedOutDate);
+      if (!resident) { skipped.push({ residentId: rid, reason: "対象住民なし又は除票" }); continue; }
+      const issue = issueCertificate(user, rid, formId, 1, body.usageText || "連件交付");
+      issued.push({ residentId: rid, issueId: issue.issueId, verifyToken: issue.verifyToken, fee: issue.fee });
+    }
+    audit(user, "ISSUE", "CERTIFICATE_BULK", "*", { formId, issued: issued.length, skipped: skipped.length });
+    return json(res, 201, { formId, issuedCount: issued.length, totalFee: issued.reduce((s, x) => s + (x.fee || 0), 0), issued, skipped });
+  }
+
   const certificatePdfMatch = path.match(/^\/certificates\/([^/]+)\/pdf$/);
   if (certificatePdfMatch && req.method === "GET") {
     const issue = state.certificates.find((item) => item.issueId === certificatePdfMatch[1]);

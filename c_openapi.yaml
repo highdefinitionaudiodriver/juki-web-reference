@@ -287,6 +287,24 @@ paths:
           content: { application/json: { schema: { $ref: '#/components/schemas/ForeignerUpdateResult' } } }
 
   # ===== 証明 =====
+  /certificates/bulk:
+    post:
+      tags: [certificate]
+      summary: 証明書の連件交付（複数宛名番号へ一括発行）
+      requestBody:
+        required: true
+        content:
+          application/json:
+            schema:
+              type: object
+              required: [residentIds]
+              properties:
+                residentIds: { type: array, items: { type: string } }
+                formId: { type: string }
+                usageText: { type: string }
+      responses:
+        '201': { description: 一括発行結果(issued/skipped) }
+        '400': { description: Validation error }
   /certificates/jumin:
     post:
       tags: [certificates]
