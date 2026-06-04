@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useEffect, useState } from "react";
 import type { Resident, Transaction } from "../types";
 import { Badges } from "../components/Badges";
 import { Field, InfoTable } from "../components/Field";
@@ -9,14 +9,28 @@ type Props = {
   onUnmask: () => void;
   onUpdateAddress: (addressText: string, eventDate: string) => Promise<void>;
   onLoadHousehold?: (residentId: string) => Promise<Resident[]>;
+  /** 事務メモ（申し送り）。指定があればメモ欄を表示。 */
+  loadNotes?: (residentId: string) => Promise<Array<{ id: string; text: string; author: string; createdAt: string }>>;
+  onAddNote?: (residentId: string, text: string) => Promise<void>;
 };
 
 const today = () => new Date().toISOString().slice(0, 10);
 
-export function ResidentView({ resident, history, onUnmask, onUpdateAddress, onLoadHousehold }: Props) {
+export function ResidentView({ resident, history, onUnmask, onUpdateAddress, onLoadHousehold, loadNotes, onAddNote }: Props) {
   const [address, setAddress] = useState("");
   const [date, setDate] = useState(today());
   const [members, setMembers] = useState<Resident[] | null>(null);
+  const [notes, setNotes] = useState<Array<{ id: string; text: string; author: string; createdAt: string }>>([]);
+  const [noteText, setNoteText] = useState("");
+
+  useEffect(() => {
+    if (loadNotes && resident?.residentId) {
+      loadNotes(resident.residentId).then(setNotes).catch(() => setNotes([]));
+    } else {
+      setNotes([]);
+    }
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [resident?.residentId]);
 
   if (!resident) {
     return <section className="panel empty">住民検索から対象者を選択してください。</section>;
@@ -54,6 +68,36 @@ export function ResidentView({ resident, history, onUnmask, onUpdateAddress, onL
           <Field label="異動日" type="date" value={date} onChange={setDate} />
           <button className="primary">単項目修正</button>
         </form>
+
+        {onAddNote && loadNotes && (
+          <div className="stack" style={{ marginTop: 16 }}>
+            <h3>事務メモ（申し送り）</h3>
+            <form
+              className="inline-form"
+              onSubmit={async (e) => {
+                e.preventDefault();
+                if (!resident.residentId || !noteText.trim()) return;
+                await onAddNote(resident.residentId, noteText);
+                setNoteText("");
+                setNotes(await loadNotes(resident.residentId));
+              }}
+            >
+              <Field label="メモ" value={noteText} onChange={setNoteText} />
+              <button>追加</button>
+            </form>
+            {notes.length === 0 ? (
+              <p className="muted">メモはありません。</p>
+            ) : (
+              <ul className="member-list">
+                {notes.map((n) => (
+                  <li key={n.id}>
+                    {n.text}（{n.author} / {n.createdAt.slice(0, 10)}）
+                  </li>
+                ))}
+              </ul>
+            )}
+          </div>
+        )}
       </section>
 
       <section className="panel">

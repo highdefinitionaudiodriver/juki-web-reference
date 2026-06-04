@@ -27,6 +27,8 @@ const state = {
   eucTemplates: [],
   // バッチ管理（標準仕様書 9 バッチ / BAT-001〜）: 実行履歴
   batchJobs: [],
+  // 住民への事務メモ（窓口での申し送り・注意事項）
+  residentNotes: [],
   // エラー・アラート設定 / アクセスログ分析（SCR-A04 / 標準仕様書 11, BAT-011）
   alertRules: {
     nightAccessEnabled: true,
@@ -725,6 +727,24 @@ async function handleApi(req, res, reqUrl) {
       .map((c) => ({ issueId: c.issueId, formId: c.formId, channel: c.channel, usageText: c.usageText, fee: c.fee, issuedAt: c.issuedAt, verifyToken: c.verifyToken }));
     audit(user, "VIEW", "CERTIFICATE_HISTORY", resident.residentId, { count: history.length });
     return json(res, 200, { residentId: resident.residentId, total: history.length, history });
+  }
+
+  // 住民への事務メモ（窓口での申し送り・注意事項）
+  const noteMatch = path.match(/^\/residents\/([^/]+)\/notes$/);
+  if (noteMatch && req.method === "GET") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, state.residentNotes.filter((n) => n.residentId === noteMatch[1]));
+  }
+  if (noteMatch && req.method === "POST") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    if (!body.text || !String(body.text).trim()) return json(res, 400, { code: "VALIDATION_ERROR", message: "text は必須です。" });
+    const resident = state.residents.find((item) => item.residentId === noteMatch[1]);
+    if (!resident) return json(res, 404, { code: "NOT_FOUND", message: "該当する住民はありません。" });
+    const note = { id: `NOTE-${Date.now()}`, residentId: noteMatch[1], text: String(body.text), author: user.userId, createdAt: new Date().toISOString() };
+    state.residentNotes.unshift(note);
+    audit(user, "CREATE", "RESIDENT_NOTE", resident.residentId, { noteId: note.id });
+    return json(res, 201, note);
   }
 
   if (residentMatch && req.method === "PUT") {

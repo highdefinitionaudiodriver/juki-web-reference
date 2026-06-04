@@ -105,6 +105,22 @@ paths:
           description: OK
           content:
             application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Transaction' } } }
+  /residents/{residentId}/notes:
+    get:
+      tags: [residents]
+      summary: 住民への事務メモ一覧（申し送り）
+      responses: { '200': { description: OK } }
+    post:
+      tags: [residents]
+      summary: 住民へ事務メモを追加
+      requestBody:
+        required: true
+        content:
+          application/json: { schema: { type: object, required: [text], properties: { text: { type: string } } } }
+      responses:
+        '201': { description: Created }
+        '400': { description: Validation error }
+        '404': { description: Not found }
   /residents/{residentId}/certificates:
     get:
       tags: [residents]

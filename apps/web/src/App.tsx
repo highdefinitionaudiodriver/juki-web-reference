@@ -151,6 +151,15 @@ export function App() {
             notify("住民情報を更新し、異動履歴に記録しました。");
           }}
           onLoadHousehold={(rid) => api.household(rid)}
+          loadNotes={(rid) => api.residentNotes(rid)}
+          onAddNote={async (rid, text) => {
+            try {
+              await api.addResidentNote(rid, text);
+              notify("事務メモを追加しました。");
+            } catch (e) {
+              setNotice({ kind: "err", message: `メモ追加に失敗しました: ${String(e)}` });
+            }
+          }}
         />
       )}
       {view === "move" && (

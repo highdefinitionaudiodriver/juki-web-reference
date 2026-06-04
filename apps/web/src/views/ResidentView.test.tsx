@@ -124,4 +124,20 @@ describe("ResidentView", () => {
     await screen.findByText(/次郎/);
   });
 
+
+  it("事務メモを追加すると onAddNote が呼ばれ一覧に反映される", async () => {
+    let store = [{ id: "NOTE-1", text: "既存メモ", author: "u", createdAt: "2026-06-03T00:00:00.000Z" }];
+    const loadNotes = vi.fn().mockImplementation(async () => store);
+    const onAddNote = vi.fn().mockImplementation(async (_rid, text) => { store = [{ id: "NOTE-2", text, author: "u", createdAt: "2026-06-03T01:00:00.000Z" }, ...store]; });
+    render(
+      <ResidentView resident={baseResident} history={[]} onUnmask={vi.fn()} onUpdateAddress={vi.fn()} loadNotes={loadNotes} onAddNote={onAddNote} />,
+    );
+    await screen.findByText(/既存メモ/);
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("メモ"), "新規申し送り");
+    await user.click(screen.getByRole("button", { name: "追加" }));
+    expect(onAddNote).toHaveBeenCalledWith(baseResident.residentId, "新規申し送り");
+    await screen.findByText(/新規申し送り/);
+  });
+
 });

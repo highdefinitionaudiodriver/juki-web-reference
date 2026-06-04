@@ -119,6 +119,10 @@ export const api = {
     const r = await request<{ householdId: string; total: number; members: Resident[] }>(`/residents/${residentId}/household`);
     return r.members;
   },
+  residentNotes: (residentId: string) =>
+    request<Array<{ id: string; residentId: string; text: string; author: string; createdAt: string }>>(`/residents/${residentId}/notes`),
+  addResidentNote: (residentId: string, text: string) =>
+    request<{ id: string; text: string }>(`/residents/${residentId}/notes`, { method: "POST", body: { text } as unknown as BodyInit }),
   moveIn: (body: MoveInReq) => request<Transaction>("/transactions/in", { method: "POST", body: body as unknown as BodyInit }),
   moveOut: (body: MoveOutReq) => request<Transaction & { certificate: CertificateIssue }>("/transactions/out", { method: "POST", body: body as unknown as BodyInit }),
   officialTransaction: (body: OfficialTxReq) => request<Transaction>("/transactions/official", { method: "POST", body: body as unknown as BodyInit }),
