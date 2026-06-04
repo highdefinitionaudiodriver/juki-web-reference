@@ -1447,6 +1447,33 @@ async function handleApi(req, res, reqUrl) {
     return json(res, 200, { rules: state.alertRules, total: alerts.length, alerts });
   }
 
+  // 契約終了時データ提供（全業務データの一括エクスポート, BAT-013相当）
+  if (req.method === "GET" && path === "/export-all") {
+    if (!user.roles?.includes("ADMIN")) return json(res, 403, { code: "FORBIDDEN" });
+    const bundle = {
+      exportedAt: new Date().toISOString(),
+      exportedBy: user.userId,
+      residents: state.residents,
+      transactions: state.transactions,
+      certificates: state.certificates,
+      conveniRequests: state.conveniRequests,
+      notifyRegistrations: state.notifyRegistrations,
+      notifications: state.notifications,
+      eucTemplates: state.eucTemplates,
+      batchJobs: state.batchJobs,
+      residentNotes: state.residentNotes,
+      auditLogs: state.auditLogs,
+    };
+    bundle.counts = Object.fromEntries(Object.entries(bundle).filter(([, v]) => Array.isArray(v)).map(([k, v]) => [k, v.length]));
+    audit(user, "EXPORT", "DATA_ALL", "*", { counts: bundle.counts });
+    res.writeHead(200, {
+      "content-type": "application/json; charset=utf-8",
+      "content-disposition": 'attachment; filename="export-all.json"',
+      "cache-control": "no-store",
+    });
+    return res.end(JSON.stringify(bundle, null, 2));
+  }
+
   // 監査ログCSV出力（操作ログ提出用）
   if (req.method === "GET" && path === "/audit/export") {
     if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });

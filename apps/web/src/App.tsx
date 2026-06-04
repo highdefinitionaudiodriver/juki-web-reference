@@ -433,6 +433,14 @@ export function App() {
               setNotice({ kind: "err", message: `監査ログCSV出力に失敗しました: ${String(e)}` });
             }
           }}
+          onExportAll={async () => {
+            try {
+              await api.exportAllData();
+              notify("全業務データをエクスポートしました（契約終了時データ提供）。");
+            } catch (e) {
+              setNotice({ kind: "err", message: `全データエクスポートに失敗しました: ${String(e)}` });
+            }
+          }}
           onEucListQueued={async () => {
             try {
               return await api.eucList("QUEUED");

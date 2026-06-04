@@ -77,6 +77,7 @@ export const api = {
   exportSearchCsv: (criteria: Partial<ResidentSearchReq>) =>
     downloadCsv("/residents/search/export", "residents.csv", { method: "POST", body: JSON.stringify(criteria) }),
   exportAuditCsv: () => downloadCsv("/audit/export", "audit-log.csv", { method: "GET" }),
+  exportAllData: () => downloadCsv("/export-all", "export-all.json", { method: "GET" }),
   async me(): Promise<Me> {
     try { return await request<Me>("/me"); } catch (e) {
       if (!enableFallbackData) throw e;

@@ -594,6 +594,14 @@ paths:
       tags: [admin]
       summary: アクセスログ分析アラート一覧（深夜アクセス・大量検索）
       responses: { '200': { description: OK } }
+  /export-all:
+    get:
+      tags: [admin]
+      summary: 契約終了時データ提供（全業務データの一括エクスポート, ADMIN）
+      responses:
+        '200':
+          description: Full data bundle (JSON)
+        '403': { description: Forbidden }
   /audit/export:
     get:
       tags: [admin]

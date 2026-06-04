@@ -8,6 +8,8 @@ type Props = {
   onRefresh: () => Promise<void>;
   /** 監査ログCSVダウンロード（指定があれば「CSV出力」ボタンを表示） */
   onExportAudit?: () => void;
+  /** 全データエクスポート（契約終了時データ提供）。指定があればボタンを表示。 */
+  onExportAll?: () => void;
   /**
    * EUC 承認キュー取得（管理者向け）。指定があれば「承認キュー」パネルが表示される。
    */
@@ -18,7 +20,7 @@ type Props = {
   onEucApprove?: (jobId: string, action: "APPROVE" | "REJECT", comment?: string) => Promise<EucAsyncJob | void>;
 };
 
-export function AdminView({ audit, onRefresh, onExportAudit, onEucListQueued, onEucApprove }: Props) {
+export function AdminView({ audit, onRefresh, onExportAudit, onExportAll, onEucListQueued, onEucApprove }: Props) {
   const [queued, setQueued] = useState<EucListItem[]>([]);
   const [comment, setComment] = useState("");
   const [lastResult, setLastResult] = useState<string | null>(null);
@@ -139,6 +141,7 @@ export function AdminView({ audit, onRefresh, onExportAudit, onEucListQueued, on
           <h2>監査ログ</h2>
           <button onClick={onRefresh}>監査ログ更新</button>
           {onExportAudit && <button onClick={onExportAudit}>CSV出力</button>}
+          {onExportAll && <button onClick={onExportAll}>全データエクスポート</button>}
         </div>
         <div className="timeline">
           {audit.map((log) => (

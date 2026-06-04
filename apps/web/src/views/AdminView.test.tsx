@@ -72,4 +72,13 @@ describe("AdminView", () => {
     expect(onExportAudit).toHaveBeenCalledTimes(1);
   });
 
+
+  it("onExportAll 指定時に 全データエクスポート ボタンを表示し呼び出す", async () => {
+    const onExportAll = vi.fn();
+    render(<AdminView audit={[]} onRefresh={vi.fn()} onExportAll={onExportAll} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "全データエクスポート" }));
+    expect(onExportAll).toHaveBeenCalledTimes(1);
+  });
+
 });
