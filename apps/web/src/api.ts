@@ -35,6 +35,7 @@ import type {
   BatchType,
   BatchJob,
   Overview,
+  Announcement,
 } from "./types";
 import { fallbackAuditLogs, fallbackMe, fallbackResidents, fallbackTransactions } from "./data";
 import { getToken } from "./auth";
@@ -74,6 +75,10 @@ async function downloadCsv(path: string, filename: string, init: RequestInit): P
 
 export const api = {
   getOverview: () => request<Overview>("/overview"),
+  listAnnouncements: () => request<Announcement[]>("/announcements"),
+  createAnnouncement: (body: { title: string; body?: string; level?: string }) =>
+    request<Announcement>("/announcements", { method: "POST", body: body as unknown as BodyInit }),
+  deleteAnnouncement: (id: string) => request<null>(`/announcements/${id}`, { method: "DELETE" }),
   exportSearchCsv: (criteria: Partial<ResidentSearchReq>) =>
     downloadCsv("/residents/search/export", "residents.csv", { method: "POST", body: JSON.stringify(criteria) }),
   exportAuditCsv: () => downloadCsv("/audit/export", "audit-log.csv", { method: "GET" }),

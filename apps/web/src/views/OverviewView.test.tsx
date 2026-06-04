@@ -33,4 +33,18 @@ describe("OverviewView (SCR-002 ダッシュボード)", () => {
     await user.click(screen.getByText("抑止対象"));
     expect(onNavigate).toHaveBeenCalledWith("restriction");
   });
+
+  it("お知らせを上部に表示し、登録フォームで onCreateAnnouncement が呼ばれる", async () => {
+    const loadAnnouncements = vi.fn().mockResolvedValue([
+      { id: "ANN-1", title: "メンテ予告", body: "日曜夜間", level: "warning", status: "active", createdAt: "2026-06-03T00:00:00.000Z" },
+    ]);
+    const onCreateAnnouncement = vi.fn().mockResolvedValue(undefined);
+    render(<OverviewView load={vi.fn().mockResolvedValue(overview)} onNavigate={vi.fn()} loadAnnouncements={loadAnnouncements} onCreateAnnouncement={onCreateAnnouncement} />);
+    await waitFor(() => expect(screen.getByText("メンテ予告")).toBeInTheDocument());
+    const user = userEvent.setup();
+    await user.type(screen.getByLabelText("お知らせ"), "新規周知");
+    await user.click(screen.getByRole("button", { name: "お知らせ登録" }));
+    expect(onCreateAnnouncement).toHaveBeenCalledWith("新規周知", "info");
+  });
+
 });

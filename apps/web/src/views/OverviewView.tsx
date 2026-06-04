@@ -1,12 +1,19 @@
 import { useEffect, useState } from "react";
-import type { Overview, ViewId } from "../types";
+import type { Announcement, Overview, ViewId } from "../types";
+import { Field } from "../components/Field";
 
 type Props = {
   load: () => Promise<Overview>;
   onNavigate: (view: ViewId) => void;
+  /** お知らせ取得（指定があればダッシュボード上部に表示） */
+  loadAnnouncements?: () => Promise<Announcement[]>;
+  /** お知らせ登録（ADMIN向け。指定があれば登録フォームを表示） */
+  onCreateAnnouncement?: (title: string, level: "info" | "warning" | "critical") => Promise<void>;
 };
 
 type Card = { label: string; value: number; view?: ViewId; warn?: boolean };
+
+const LEVEL_CLASS: Record<string, string> = { info: "", warning: "warn", critical: "err" };
 
 /**
  * SCR-002: ダッシュボード（メインメニュー）
@@ -14,11 +21,19 @@ type Card = { label: string; value: number; view?: ViewId; warn?: boolean };
  *  - 住民・異動・証明・抑止・本人通知・アラート等の主要指標を集約表示する。
  *  - 各カードから対応する業務画面へ遷移できる。
  */
-export function OverviewView({ load, onNavigate }: Props) {
+export function OverviewView({ load, onNavigate, loadAnnouncements, onCreateAnnouncement }: Props) {
   const [ov, setOv] = useState<Overview | null>(null);
+  const [announcements, setAnnouncements] = useState<Announcement[]>([]);
+  const [annTitle, setAnnTitle] = useState("");
+  const [annLevel, setAnnLevel] = useState<"info" | "warning" | "critical">("info");
+
+  const refreshAnn = async () => {
+    if (loadAnnouncements) setAnnouncements(await loadAnnouncements());
+  };
 
   useEffect(() => {
     load().then(setOv).catch(() => undefined);
+    refreshAnn().catch(() => undefined);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
@@ -42,6 +57,41 @@ export function OverviewView({ load, onNavigate }: Props) {
   return (
     <section className="panel">
       <h2>ダッシュボード</h2>
+
+      {loadAnnouncements && announcements.length > 0 && (
+        <div className="stack" style={{ marginBottom: 16 }}>
+          {announcements.map((a) => (
+            <div key={a.id} className={`notice ${LEVEL_CLASS[a.level] ?? ""}`}>
+              <strong>{a.title}</strong>{a.body ? ` — ${a.body}` : ""}
+            </div>
+          ))}
+        </div>
+      )}
+      {onCreateAnnouncement && (
+        <form
+          className="inline-form"
+          style={{ marginBottom: 16 }}
+          onSubmit={async (e) => {
+            e.preventDefault();
+            if (!annTitle.trim()) return;
+            await onCreateAnnouncement(annTitle, annLevel);
+            setAnnTitle("");
+            await refreshAnn();
+          }}
+        >
+          <Field label="お知らせ" value={annTitle} onChange={setAnnTitle} />
+          <label className="check">
+            重要度
+            <select aria-label="重要度" value={annLevel} onChange={(e) => setAnnLevel(e.target.value as "info" | "warning" | "critical")}>
+              <option value="info">情報</option>
+              <option value="warning">注意</option>
+              <option value="critical">重要</option>
+            </select>
+          </label>
+          <button>お知らせ登録</button>
+        </form>
+      )}
+
       <p className="muted" style={{ marginBottom: 16 }}>住民記録システムの主要指標です。カードをクリックすると該当業務へ移動します。</p>
       <div className="card-grid">
         {cards.map((c) => (

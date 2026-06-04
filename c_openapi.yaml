@@ -545,6 +545,22 @@ paths:
       tags: [admin]
       summary: ダッシュボード 主要指標の集約（SCR-002）
       responses: { '200': { description: OK } }
+  /announcements:
+    get:
+      tags: [admin]
+      summary: お知らせ一覧（運用周知）
+      responses: { '200': { description: OK } }
+    post:
+      tags: [admin]
+      summary: お知らせ登録（ADMIN, level=info/warning/critical）
+      responses: { '201': { description: Created }, '400': { description: Validation error }, '403': { description: Forbidden } }
+  /announcements/{id}:
+    delete:
+      tags: [admin]
+      summary: お知らせ削除（ADMIN）
+      parameters:
+        - { name: id, in: path, required: true, schema: { type: string } }
+      responses: { '204': { description: Deleted }, '404': { description: Not found } }
   /batch-jobs:
     get:
       tags: [admin]

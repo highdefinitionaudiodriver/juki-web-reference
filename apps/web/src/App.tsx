@@ -116,7 +116,23 @@ export function App() {
       }}
     >
       {view === "overview" && (
-        <OverviewView load={() => api.getOverview()} onNavigate={setView} />
+        <OverviewView
+          load={() => api.getOverview()}
+          onNavigate={setView}
+          loadAnnouncements={() => api.listAnnouncements()}
+          onCreateAnnouncement={
+            me?.roles?.includes("ADMIN")
+              ? async (title, level) => {
+                  try {
+                    await api.createAnnouncement({ title, level });
+                    notify("お知らせを登録しました。");
+                  } catch (e) {
+                    setNotice({ kind: "err", message: `お知らせ登録に失敗しました: ${String(e)}` });
+                  }
+                }
+              : undefined
+          }
+        />
       )}
       {view === "search" && (
         <SearchView

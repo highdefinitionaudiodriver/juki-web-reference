@@ -30,6 +30,17 @@ export type AliasName = Schemas["AliasName"];
 
 export type ViewId = "overview" | "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts" | "eucdesign" | "batch";
 
+// お知らせ（運用周知）
+export type Announcement = {
+  id: string;
+  title: string;
+  body: string;
+  level: "info" | "warning" | "critical";
+  status: string;
+  createdBy?: string;
+  createdAt: string;
+};
+
 // ダッシュボード（SCR-002）
 export type Overview = {
   residents: { total: number; active: number; foreigners: number; specialPermanent: number; restricted: number };

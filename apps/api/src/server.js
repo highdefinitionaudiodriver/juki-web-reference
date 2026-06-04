@@ -29,6 +29,8 @@ const state = {
   batchJobs: [],
   // 住民への事務メモ（窓口での申し送り・注意事項）
   residentNotes: [],
+  // お知らせ（運用担当者向けシステム周知）
+  announcements: [],
   // エラー・アラート設定 / アクセスログ分析（SCR-A04 / 標準仕様書 11, BAT-011）
   alertRules: {
     nightAccessEnabled: true,
@@ -1445,6 +1447,30 @@ async function handleApi(req, res, reqUrl) {
     if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
     const alerts = analyzeAlerts(state.alertRules, state.auditLogs);
     return json(res, 200, { rules: state.alertRules, total: alerts.length, alerts });
+  }
+
+  // お知らせ（運用担当者向けシステム周知）
+  if (req.method === "GET" && path === "/announcements") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, state.announcements.filter((a) => a.status !== "deleted"));
+  }
+  if (req.method === "POST" && path === "/announcements") {
+    if (!user.roles?.includes("ADMIN")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    if (!body.title || !String(body.title).trim()) return json(res, 400, { code: "VALIDATION_ERROR", message: "title は必須です。" });
+    const item = { id: `ANN-${Date.now()}`, title: String(body.title), body: String(body.body || ""), level: ["info", "warning", "critical"].includes(body.level) ? body.level : "info", status: "active", createdBy: user.userId, createdAt: new Date().toISOString() };
+    state.announcements.unshift(item);
+    audit(user, "CREATE", "ANNOUNCEMENT", item.id, { level: item.level });
+    return json(res, 201, item);
+  }
+  const announceMatch = path.match(/^\/announcements\/([^/]+)$/);
+  if (announceMatch && req.method === "DELETE") {
+    if (!user.roles?.includes("ADMIN")) return json(res, 403, { code: "FORBIDDEN" });
+    const item = state.announcements.find((a) => a.id === announceMatch[1]);
+    if (!item) return json(res, 404, { code: "NOT_FOUND" });
+    item.status = "deleted";
+    audit(user, "DELETE", "ANNOUNCEMENT", item.id, {});
+    res.writeHead(204); return res.end();
   }
 
   // 契約終了時データ提供（全業務データの一括エクスポート, BAT-013相当）
