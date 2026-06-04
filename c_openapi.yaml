@@ -105,6 +105,14 @@ paths:
           description: OK
           content:
             application/json: { schema: { type: array, items: { $ref: '#/components/schemas/Transaction' } } }
+  /residents/{residentId}/certificates:
+    get:
+      tags: [residents]
+      summary: 証明書の交付履歴照会（機能 0040084）
+      responses:
+        '200':
+          description: OK
+        '404': { description: Not found }
   /residents/{residentId}/household:
     get:
       tags: [residents]

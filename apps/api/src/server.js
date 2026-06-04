@@ -714,6 +714,19 @@ async function handleApi(req, res, reqUrl) {
     return json(res, 200, { householdId: resident.householdId, total: members.length, members });
   }
 
+  // 機能 0040084: 証明書の交付履歴照会
+  const certHistoryMatch = path.match(/^\/residents\/([^/]+)\/certificates$/);
+  if (certHistoryMatch && req.method === "GET") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const resident = state.residents.find((item) => item.residentId === certHistoryMatch[1]);
+    if (!resident) return json(res, 404, { code: "NOT_FOUND", message: "該当する住民はありません。" });
+    const history = state.certificates
+      .filter((c) => c.residentId === resident.residentId)
+      .map((c) => ({ issueId: c.issueId, formId: c.formId, channel: c.channel, usageText: c.usageText, fee: c.fee, issuedAt: c.issuedAt, verifyToken: c.verifyToken }));
+    audit(user, "VIEW", "CERTIFICATE_HISTORY", resident.residentId, { count: history.length });
+    return json(res, 200, { residentId: resident.residentId, total: history.length, history });
+  }
+
   if (residentMatch && req.method === "PUT") {
     if (!canAction(user, "TRANSACTION") && !canAction(user, "MOVE_IN_APPLY")) return json(res, 403, { code: "FORBIDDEN" });
     const body = await readBody(req);

@@ -210,6 +210,7 @@ export function App() {
               setNotice({ kind: "err", message: `連件交付に失敗しました: ${String(e)}` });
             }
           }}
+          loadHistory={async (rid) => (await api.certificateHistory(rid)).history}
         />
       )}
       {view === "notify" && (

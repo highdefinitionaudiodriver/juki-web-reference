@@ -8,9 +8,11 @@ type Props = {
   onIssue: (req: CertificateReq) => Promise<CertificateIssue | void>;
   /** 連件交付（複数宛名番号への一括発行）。指定があれば連件交付パネルを表示。 */
   onBulkIssue?: (residentIds: string[], formId: string) => Promise<void>;
+  /** 交付履歴照会（機能 0040084）。指定があれば交付履歴パネルを表示。 */
+  loadHistory?: (residentId: string) => Promise<Array<{ issueId: string; formId: string; channel: string; usageText: string; issuedAt: string }>>;
 };
 
-export function CertificateView({ resident, onIssue, onBulkIssue }: Props) {
+export function CertificateView({ resident, onIssue, onBulkIssue, loadHistory }: Props) {
   const [formId, setFormId] = useState("0010001");
   const [scope, setScope] = useState<"SELF" | "HOUSEHOLD" | "MEMBERS">("SELF");
   const [copies, setCopies] = useState("1");
@@ -19,6 +21,7 @@ export function CertificateView({ resident, onIssue, onBulkIssue }: Props) {
   const [showMyNumber, setShowMyNumber] = useState(false);
   const [issued, setIssued] = useState<CertificateIssue | null>(null);
   const [bulkIds, setBulkIds] = useState("");
+  const [history, setHistory] = useState<Array<{ issueId: string; formId: string; channel: string; usageText: string; issuedAt: string }> | null>(null);
 
   if (!resident) {
     return <section className="panel empty">証明発行対象を選択してください。</section>;
@@ -147,6 +150,33 @@ export function CertificateView({ resident, onIssue, onBulkIssue }: Props) {
             />
             <button>連件交付</button>
           </form>
+        )}
+        {loadHistory && (
+          <div className="stack" style={{ marginTop: 16 }}>
+            <div className="section-head">
+              <h3>交付履歴</h3>
+              <button
+                onClick={async () => {
+                  if (resident.residentId) setHistory(await loadHistory(resident.residentId));
+                }}
+              >
+                交付履歴を表示
+              </button>
+            </div>
+            {history && (
+              history.length === 0 ? (
+                <p className="muted">交付履歴はありません。</p>
+              ) : (
+                <ul className="member-list">
+                  {history.map((h) => (
+                    <li key={h.issueId}>
+                      {h.issuedAt.slice(0, 10)} / {h.formId} / {h.channel} / {h.usageText}
+                    </li>
+                  ))}
+                </ul>
+              )
+            )}
+          </div>
         )}
       </section>
     </div>

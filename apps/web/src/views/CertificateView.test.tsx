@@ -118,4 +118,16 @@ describe("CertificateView", () => {
     expect(onBulkIssue).toHaveBeenCalledWith(["R-001", "R-002", "R-003"], "0010001");
   });
 
+
+  it("交付履歴を表示ボタンで loadHistory が呼ばれ履歴を表示する", async () => {
+    const loadHistory = vi.fn().mockResolvedValue([
+      { issueId: "CI-1", formId: "0010001", channel: "WINDOW", usageText: "窓口請求", issuedAt: "2026-06-03T10:00:00.000Z" },
+    ]);
+    render(<CertificateView resident={resident} onIssue={vi.fn()} loadHistory={loadHistory} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: "交付履歴を表示" }));
+    expect(loadHistory).toHaveBeenCalledWith(resident.residentId);
+    await screen.findByText(/CI-1|窓口請求/);
+  });
+
 });
