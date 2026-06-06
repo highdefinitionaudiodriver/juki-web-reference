@@ -614,6 +614,28 @@ async function handleApi(req, res, reqUrl) {
   if (req.method === "POST" && path === "/auth/logout") { res.writeHead(204); return res.end(); }
   if (req.method === "GET" && path === "/me") return json(res, 200, user);
 
+  // システム情報（運用・監視用）
+  if (req.method === "GET" && path === "/system-info") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, {
+      node: process.version,
+      platform: process.platform,
+      pid: process.pid,
+      uptimeSeconds: Math.floor(process.uptime()),
+      serverTime: new Date().toISOString(),
+      dataCounts: {
+        residents: state.residents.length,
+        transactions: state.transactions.length,
+        certificates: state.certificates.length,
+        restrictions: state.residents.reduce((s, r) => s + (r.restrictions?.length || 0), 0),
+        notifications: state.notifications.length,
+        batchJobs: state.batchJobs.length,
+        announcements: state.announcements.filter((a) => a.status !== "deleted").length,
+        auditLogs: state.auditLogs.length,
+      },
+    });
+  }
+
   // SCR-002: ダッシュボード（主要指標の集約）
   if (req.method === "GET" && path === "/overview") {
     if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });

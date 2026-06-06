@@ -30,6 +30,16 @@ export type AliasName = Schemas["AliasName"];
 
 export type ViewId = "overview" | "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts" | "eucdesign" | "batch";
 
+// システム情報（運用・監視）
+export type SystemInfo = {
+  node: string;
+  platform: string;
+  pid: number;
+  uptimeSeconds: number;
+  serverTime: string;
+  dataCounts: Record<string, number>;
+};
+
 // お知らせ（運用周知）
 export type Announcement = {
   id: string;

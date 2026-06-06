@@ -540,6 +540,11 @@ paths:
     post: { tags: [admin], summary: ロール作成, responses: { '201': { description: Created } } }
   /admin/permissions:
     post: { tags: [admin], summary: 権限マトリクス更新, responses: { '200': { description: OK } } }
+  /system-info:
+    get:
+      tags: [admin]
+      summary: システム情報（Node版/稼働時間/データ件数等, 運用・監視用）
+      responses: { '200': { description: OK }, '403': { description: Forbidden } }
   /overview:
     get:
       tags: [admin]
