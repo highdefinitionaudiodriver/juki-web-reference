@@ -1607,6 +1607,21 @@ async function handleApi(req, res, reqUrl) {
     item.updatedAt = new Date().toISOString();
     item.history.push({ status: next, at: item.updatedAt });
     audit(user, "UPDATE", "LINK_APPLICATION", item.id, { status: next });
+    // 市民ポータルへ処理状況をコールバック通知（任意・ベストエフォート）
+    const portalBase = process.env.PORTAL_CALLBACK_BASE;
+    if (portalBase && item.externalId) {
+      try {
+        const ctrl = new AbortController();
+        const cbTimer = setTimeout(() => ctrl.abort(), 4000);
+        await fetch(`${portalBase.replace(/\/$/, "")}/api/link/callback`, {
+          method: "POST",
+          headers: { "content-type": "application/json", "x-link-token": process.env.LINK_TOKEN || "portal-link-dev-token" },
+          body: JSON.stringify({ externalId: item.externalId, status: next }),
+          signal: ctrl.signal,
+        });
+        clearTimeout(cbTimer);
+      } catch { /* 通知失敗は無視（状態更新自体は成功） */ }
+    }
     return json(res, 200, item);
   }
 
