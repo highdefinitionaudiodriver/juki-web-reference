@@ -91,3 +91,19 @@ html{-webkit-text-size-adjust:100%}
   .paper{padding:20px}
 }
 /* ════════ /RESP-v1 ════════ */
+
+/* ════════ RESP-v2: 追従サイドバー・可読性・タッチ/a11y改善 ════════ */
+html{scroll-behavior:smooth}
+/* キーボード操作時のフォーカスを明示 */
+:focus-visible{outline:3px solid var(--accent);outline-offset:1px}
+/* 長い文字列でセル・パネルが横にはみ出さないように */
+td,.panel,.timeline article{overflow-wrap:anywhere}
+/* PC幅では左ナビ(サイド)を画面に追従させ、長い一覧でも操作しやすく */
+@media(min-width:901px){
+  .side{position:sticky;top:0;align-self:start;height:100vh;overflow:auto}
+}
+/* スマホでは入力欄も押しやすい高さに */
+@media(max-width:600px){
+  .field input,.field select,select,textarea,input{min-height:44px}
+}
+/* ════════ /RESP-v2 ════════ */
