@@ -58,4 +58,14 @@ test("オンライン申請 受付簿（ポータル等からのインバウン�
   await inbound({ foo: "bar" });
   const list2 = await fetch(`${base()}/link/applications`, { headers: { "x-dev-roles": "WINDOW" } }).then((r) => r.json());
   assert.ok(!list2.some((a) => a.payload && a.payload.foo === "bar"));
+
+  // 受付簿のCSV出力（BOM付き）
+  const csvRes = await fetch(`${base()}/link/applications/export`, { headers: { "x-dev-roles": "WINDOW" } });
+  assert.equal(csvRes.status, 200);
+  assert.match(csvRes.headers.get("content-type"), /text\/csv/);
+  const buf = Buffer.from(await csvRes.arrayBuffer());
+  assert.deepEqual([buf[0], buf[1], buf[2]], [0xEF, 0xBB, 0xBF]);
+  const csv = buf.toString("utf8");
+  assert.match(csv, /受付日時/);
+  assert.match(csv, /山田 花子/);
 });

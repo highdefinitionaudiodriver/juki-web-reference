@@ -1576,6 +1576,25 @@ async function handleApi(req, res, reqUrl) {
     if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
     return json(res, 200, state.linkApplications);
   }
+  // 受付簿のCSV出力（職員の処理・提出用）
+  if (req.method === "GET" && path === "/link/applications/export") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const cols = [["receivedAt", "受付日時"], ["status", "状態"], ["receiptNumber", "受付番号"], ["procedureType", "手続き種別"], ["applicantName", "申請者"], ["residentId", "住民ID"], ["source", "連携元"], ["externalId", "外部ID"], ["id", "受付ID"]];
+    const esc = (v) => {
+      const s = typeof v === "object" && v !== null ? JSON.stringify(v) : String(v ?? "");
+      return /[",\n]/.test(s) ? `"${s.replaceAll('"', '""')}"` : s;
+    };
+    const rows = state.linkApplications.map((a) => ({ ...a, applicantName: a.applicant && a.applicant.name, residentId: a.applicant && a.applicant.residentId }));
+    const header = cols.map(([, label]) => label).join(",");
+    const lines = rows.map((r) => cols.map(([k]) => esc(r[k])).join(","));
+    const csv = `﻿${[header, ...lines].join("\r\n")}\r\n`;
+    res.writeHead(200, {
+      "content-type": "text/csv; charset=utf-8",
+      "content-disposition": 'attachment; filename="link-applications.csv"',
+      "cache-control": "no-store",
+    });
+    return res.end(csv);
+  }
   const linkStatusMatch = path.match(/^\/link\/applications\/([^/]+)\/status$/);
   if (linkStatusMatch && req.method === "POST") {
     if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });

@@ -535,6 +535,11 @@ paths:
       tags: [link]
       summary: オンライン申請 受付簿の一覧（職員用, VIEW）
       responses: { '200': { description: OK }, '403': { description: Forbidden } }
+  /link/applications/export:
+    get:
+      tags: [link]
+      summary: オンライン申請 受付簿のCSV出力（VIEW, BOM付きUTF-8）
+      responses: { '200': { description: CSV }, '403': { description: Forbidden } }
   /link/applications/{id}/status:
     post:
       tags: [link]
