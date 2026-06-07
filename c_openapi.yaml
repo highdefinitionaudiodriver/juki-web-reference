@@ -527,9 +527,19 @@ paths:
   /link/application/inbound:
     post:
       tags: [link]
-      summary: 申請管理システム受信
+      summary: 申請管理システム受信（市民ポータル等からのインバウンド申請。受付簿に取り込む）
       responses:
         '202': { description: 受付, content: { application/json: { schema: { $ref: '#/components/schemas/LinkAcceptResult' } } } }
+  /link/applications:
+    get:
+      tags: [link]
+      summary: オンライン申請 受付簿の一覧（職員用, VIEW）
+      responses: { '200': { description: OK }, '403': { description: Forbidden } }
+  /link/applications/{id}/status:
+    post:
+      tags: [link]
+      summary: オンライン申請の処理状況更新（RECEIVED/PROCESSING/COMPLETED/REJECTED, VIEW）
+      responses: { '200': { description: OK }, '400': { description: Validation Error }, '404': { description: Not Found } }
 
   # ===== 管理 =====
   /admin/users:

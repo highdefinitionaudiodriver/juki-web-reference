@@ -31,6 +31,8 @@ const state = {
   residentNotes: [],
   // お知らせ（運用担当者向けシステム周知）
   announcements: [],
+  // オンライン申請受付（市民オンライン手続きポータル等からのインバウンド連携）
+  linkApplications: [],
   // エラー・アラート設定 / アクセスログ分析（SCR-A04 / 標準仕様書 11, BAT-011）
   alertRules: {
     nightAccessEnabled: true,
@@ -1232,11 +1234,36 @@ async function handleApi(req, res, reqUrl) {
     return json(res, 202, { eventId: String(event.eventId), partnerId, status: "ACCEPTED", receivedAt: event.receivedAt });
   }
 
-  // 申請管理 受領のみ
+  // 申請管理 受領（市民オンライン手続きポータル等からのインバウンド申請）。
+  // 連携イベントを記録するとともに、職員が処理する受付簿(state.linkApplications)へ取り込む。
   if (req.method === "POST" && path === "/link/application/inbound") {
     const body = await readBody(req);
     const event = acceptLinkEvent("APPLICATION", body, "ACCEPTED", null);
     audit(user, "RECEIVE", "LINK", String(event.eventId), { partnerId: "APPLICATION" });
+    // 受付簿への取り込み（procedureType と applicant.name があるもののみ。冪等: source+externalId）
+    const applicant = body.applicant && typeof body.applicant === "object" ? body.applicant : {};
+    if (body.procedureType && applicant.name) {
+      const externalId = body.externalId ? String(body.externalId) : null;
+      const source = String(body.source || "citizen-portal");
+      const dupe = externalId ? state.linkApplications.find((a) => a.source === source && a.externalId === externalId) : null;
+      if (!dupe) {
+        const now = new Date().toISOString();
+        state.linkApplications.unshift({
+          id: `LINK-${Date.now()}-${Math.floor(Math.random() * 1e6)}`,
+          eventId: String(event.eventId),
+          source,
+          externalId,
+          receiptNumber: body.receiptNumber ? String(body.receiptNumber) : null,
+          procedureType: String(body.procedureType),
+          applicant: { residentId: applicant.residentId ? String(applicant.residentId) : null, name: String(applicant.name) },
+          payload: body.payload && typeof body.payload === "object" ? body.payload : {},
+          status: "RECEIVED",
+          receivedAt: now,
+          updatedAt: now,
+          history: [{ status: "RECEIVED", at: now }],
+        });
+      }
+    }
     return json(res, 202, { eventId: String(event.eventId), partnerId: "APPLICATION", status: "ACCEPTED", receivedAt: event.receivedAt });
   }
 
@@ -1542,6 +1569,27 @@ async function handleApi(req, res, reqUrl) {
   }
 
   if (req.method === "GET" && path === "/audit") return json(res, 200, state.auditLogs.slice(0, 100));
+
+  // ── オンライン申請 受付簿（市民オンライン手続きポータル等からのインバウンド申請を職員が処理）──
+  // 受信自体は既存の POST /link/application/inbound（申請管理 受領）が state.linkApplications へ取り込む。
+  if (req.method === "GET" && path === "/link/applications") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, state.linkApplications);
+  }
+  const linkStatusMatch = path.match(/^\/link\/applications\/([^/]+)\/status$/);
+  if (linkStatusMatch && req.method === "POST") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const next = String(body.status || "");
+    if (!["RECEIVED", "PROCESSING", "COMPLETED", "REJECTED"].includes(next)) return json(res, 400, { code: "VALIDATION_ERROR", message: "status が不正です。" });
+    const item = state.linkApplications.find((a) => a.id === linkStatusMatch[1]);
+    if (!item) return json(res, 404, { code: "NOT_FOUND" });
+    item.status = next;
+    item.updatedAt = new Date().toISOString();
+    item.history.push({ status: next, at: item.updatedAt });
+    audit(user, "UPDATE", "LINK_APPLICATION", item.id, { status: next });
+    return json(res, 200, item);
+  }
 
   return json(res, 404, { code: "NOT_FOUND", message: "APIが見つかりません。" });
 }
