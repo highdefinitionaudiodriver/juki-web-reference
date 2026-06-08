@@ -107,3 +107,17 @@ td,.panel,.timeline article{overflow-wrap:anywhere}
   .field input,.field select,select,textarea,input{min-height:44px}
 }
 /* ════════ /RESP-v2 ════════ */
+
+/* ════════ RESP-v3: タッチ操作・高コントラスト・省スペースの仕上げ ════════ */
+button,a,.stat-card,summary{-webkit-tap-highlight-color:rgba(8,127,140,.18)}
+button{touch-action:manipulation}
+button:active{transform:translateY(1px)}
+@media(prefers-contrast:more){
+  button,input,select,textarea,.panel,th,td{border-color:CanvasText}
+  :focus-visible{outline-width:4px}
+}
+@media(max-height:520px){
+  .side{padding-top:10px;padding-bottom:10px}
+  .main{padding-top:12px;padding-bottom:12px}
+}
+/* ════════ /RESP-v3 ════════ */
