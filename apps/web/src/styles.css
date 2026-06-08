@@ -121,3 +121,10 @@ button:active{transform:translateY(1px)}
   .main{padding-top:12px;padding-bottom:12px}
 }
 /* ════════ /RESP-v3 ════════ */
+
+/* ════════ RESP-v4: スキップリンク(a11y)・スクロール安定・フルハイト ════════ */
+.skip-link{position:absolute;left:8px;top:-48px;z-index:100;background:var(--accent);color:#fff;padding:8px 14px;border-radius:0 0 8px 8px;font-weight:700;transition:top .15s}
+.skip-link:focus{top:0}
+html{scrollbar-gutter:stable}
+.shell{min-height:100dvh}
+/* ════════ /RESP-v4 ════════ */

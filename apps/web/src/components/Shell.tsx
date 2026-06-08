@@ -40,7 +40,7 @@ export function Shell({ me, nav, view, title, subtitle, notice, onChangeView, on
           </div>
         </div>
       </aside>
-      <main className="main">
+      <main className="main" id="maincontent">
         <header className="topbar">
           <div>
             <h1>{title}</h1>
