@@ -20,6 +20,7 @@ const BADGE: Record<string, string> = { RECEIVED: "blue", PROCESSING: "warn", CO
 export function LinkApplicationsView({ load, onAdvance, onExport }: Props) {
   const [apps, setApps] = useState<LinkApplication[]>([]);
   const [busy, setBusy] = useState<string | null>(null);
+  const [filter, setFilter] = useState<string>("ALL");
 
   const refresh = async () => setApps(await load());
   useEffect(() => {
@@ -47,6 +48,15 @@ export function LinkApplicationsView({ load, onAdvance, onExport }: Props) {
         </div>
       </div>
       <p className="muted">市民ポータル等から受信したオンライン申請です。状態を進めると申請元（市民）へ自動で通知されます。</p>
+      {apps.length > 0 && (
+        <div className="badge-row" style={{ marginBottom: 12 }}>
+          {(["ALL", ...Array.from(new Set(apps.map((a) => a.status)))] as string[]).map((s) => (
+            <button key={s} className={filter === s ? "active" : ""} onClick={() => setFilter(s)}>
+              {(s === "ALL" ? "すべて" : (LABEL[s] ?? s)) + "（" + (s === "ALL" ? apps.length : apps.filter((a) => a.status === s).length) + "）"}
+            </button>
+          ))}
+        </div>
+      )}
       {apps.length === 0 ? (
         <p className="muted">受信した申請はありません。</p>
       ) : (
@@ -56,7 +66,7 @@ export function LinkApplicationsView({ load, onAdvance, onExport }: Props) {
               <tr><th>受付日時</th><th>手続き</th><th>申請者</th><th>連携元</th><th>状態</th><th>操作</th></tr>
             </thead>
             <tbody>
-              {apps.map((a) => {
+              {apps.filter((a) => filter === "ALL" || a.status === filter).map((a) => {
                 const next = NEXT[a.status];
                 const closed = a.status === "COMPLETED" || a.status === "REJECTED";
                 return (

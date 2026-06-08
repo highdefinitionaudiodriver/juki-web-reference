@@ -30,6 +30,20 @@ describe("LinkApplicationsView (オンライン申請 受付簿)", () => {
     expect(onAdvance).toHaveBeenCalledWith("LINK-1", "PROCESSING");
   });
 
+  it("状態フィルタで申請を絞り込める", async () => {
+    const two: LinkApplication[] = [
+      apps[0]!,
+      { ...apps[0]!, id: "LINK-2", applicant: { residentId: "200", name: "鈴木 一郎" }, status: "PROCESSING" },
+    ];
+    render(<LinkApplicationsView load={vi.fn().mockResolvedValue(two)} onAdvance={vi.fn()} onExport={vi.fn()} />);
+    await waitFor(() => expect(screen.getByText("鈴木 一郎")).toBeInTheDocument());
+    const user = userEvent.setup();
+    // 「受付（1）」チップで絞り込み → 処理中の鈴木は消える
+    await user.click(screen.getByRole("button", { name: "受付（1）" }));
+    expect(screen.queryByText("鈴木 一郎")).not.toBeInTheDocument();
+    expect(screen.getByText("山田 花子")).toBeInTheDocument();
+  });
+
   it("CSV出力ボタンで onExport が呼ばれる", async () => {
     const onExport = vi.fn().mockResolvedValue(undefined);
     render(<LinkApplicationsView load={vi.fn().mockResolvedValue([])} onAdvance={vi.fn()} onExport={onExport} />);
