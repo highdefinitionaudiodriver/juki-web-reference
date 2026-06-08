@@ -26,6 +26,7 @@ import { AlertSettingsView } from "./views/AlertSettingsView";
 import { EucDesignView } from "./views/EucDesignView";
 import { BatchView } from "./views/BatchView";
 import { OverviewView } from "./views/OverviewView";
+import { LinkApplicationsView } from "./views/LinkApplicationsView";
 
 const NAV: Array<[ViewId, string]> = [
   ["overview", "ダッシュボード"],
@@ -42,6 +43,7 @@ const NAV: Array<[ViewId, string]> = [
   ["reports", "統計/EUC"],
   ["eucdesign", "EUC設計"],
   ["batch", "バッチ"],
+  ["link", "オンライン申請"],
   ["alerts", "アラート設定"],
   ["admin", "権限/監査"],
 ];
@@ -326,6 +328,26 @@ export function App() {
               notify(`バッチ「${job.name}」を実行しました（処理件数: ${job.processed}）。`);
             } catch (e) {
               setNotice({ kind: "err", message: `バッチ実行に失敗しました: ${String(e)}` });
+            }
+          }}
+        />
+      )}
+      {view === "link" && (
+        <LinkApplicationsView
+          load={() => api.listLinkApplications()}
+          onAdvance={async (id, status) => {
+            try {
+              await api.updateLinkApplicationStatus(id, status);
+              notify("申請の状態を更新し、申請元へ通知しました。");
+            } catch (e) {
+              setNotice({ kind: "err", message: `状態更新に失敗しました: ${String(e)}` });
+            }
+          }}
+          onExport={async () => {
+            try {
+              await api.exportLinkApplicationsCsv();
+            } catch (e) {
+              setNotice({ kind: "err", message: `CSV出力に失敗しました: ${String(e)}` });
             }
           }}
         />

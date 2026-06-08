@@ -2,6 +2,7 @@ import type {
   AsyncJob,
   ApprovalReq,
   AuditLog,
+  LinkApplication,
   CancelReq,
   CodeIssueResult,
   CertificateIssue,
@@ -238,4 +239,9 @@ export const api = {
   listConveni: () => request<ConveniRequest[]>("/certificates/conveni"),
   requestConveni: (body: { residentId: string; formId?: string; storeCode?: string }) =>
     request<ConveniRequest>("/certificates/conveni", { method: "POST", body: body as unknown as BodyInit }),
+  // オンライン申請 受付簿（市民ポータル等からのインバウンド申請）
+  listLinkApplications: () => request<LinkApplication[]>("/link/applications"),
+  updateLinkApplicationStatus: (id: string, status: string) =>
+    request<LinkApplication>(`/link/applications/${id}/status`, { method: "POST", body: { status } as unknown as BodyInit }),
+  exportLinkApplicationsCsv: () => downloadCsv("/link/applications/export", "link-applications.csv", { method: "GET" }),
 };

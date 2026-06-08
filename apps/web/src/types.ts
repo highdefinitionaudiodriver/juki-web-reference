@@ -28,7 +28,19 @@ export type ForeignerExpiryReportReq = Schemas["ForeignerExpiryReportReq"];
 export type ForeignerExpiryJob = Schemas["ForeignerExpiryJob"];
 export type AliasName = Schemas["AliasName"];
 
-export type ViewId = "overview" | "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts" | "eucdesign" | "batch";
+export type ViewId = "overview" | "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts" | "eucdesign" | "batch" | "link";
+
+export type LinkApplication = {
+  id: string;
+  source: string;
+  externalId: string | null;
+  receiptNumber: string | null;
+  procedureType: string;
+  applicant: { residentId: string | null; name: string };
+  status: "RECEIVED" | "PROCESSING" | "COMPLETED" | "REJECTED";
+  receivedAt: string;
+  updatedAt: string;
+};
 
 // システム情報（運用・監視）
 export type SystemInfo = {
