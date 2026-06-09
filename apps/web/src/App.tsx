@@ -253,6 +253,10 @@ export function App() {
               setNotice({ kind: "err", message: `手数料の算定に失敗しました: ${String(e)}` });
             }
           }}
+          onProceedToIssue={(req) => {
+            notify(`${req.certType}（${req.copies}通）の発行へ進みます。対象住民を選択してください。`);
+            setView("certificate");
+          }}
         />
       )}
       {view === "notify" && (

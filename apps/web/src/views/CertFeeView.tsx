@@ -5,6 +5,8 @@ import { Field, SelectField, InfoTable } from "../components/Field";
 type Props = {
   /** 手数料算定 API。指定がなければ算定不可。 */
   onCalc: (req: CertFeeReq) => Promise<CertFeeResult | void>;
+  /** 試算→そのまま発行の導線。指定があれば結果に「証明発行へ」CTAを表示。 */
+  onProceedToIssue?: (req: CertFeeReq) => void;
 };
 
 const CERT_TYPES: Array<[string, string]> = [
@@ -21,7 +23,7 @@ const CERT_TYPES: Array<[string, string]> = [
  * 証明種別・通数・郵送有無を入力すると即座に手数料合計を表示する
  * 「ぱっと入力→ぱっと結果」のクイック算定ビュー。
  */
-export function CertFeeView({ onCalc }: Props) {
+export function CertFeeView({ onCalc, onProceedToIssue }: Props) {
   const [certType, setCertType] = useState(CERT_TYPES[0]![0]);
   const [copies, setCopies] = useState("1");
   const [postal, setPostal] = useState(false);
@@ -90,6 +92,19 @@ export function CertFeeView({ onCalc }: Props) {
                 ["合計", yen(result.total)],
               ]}
             />
+            {onProceedToIssue && (
+              <div style={{ paddingTop: 12, borderTop: "1px dashed var(--line, #d8dee6)" }}>
+                <p className="muted" style={{ margin: "0 0 8px" }}>この内容で証明書を発行できます。</p>
+                <button
+                  className="primary"
+                  type="button"
+                  style={{ width: "100%" }}
+                  onClick={() => onProceedToIssue({ certType, copies: Number(copies || 1), postal })}
+                >
+                  この内容で証明発行へ →
+                </button>
+              </div>
+            )}
           </div>
         ) : (
           <p className="muted">証明種別と通数を入力して「手数料を算定」を押してください。</p>

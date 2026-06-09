@@ -25,6 +25,16 @@ describe("CertFeeView (証明手数料の算定 / クイック算定)", () => {
     expect(status).toHaveTextContent("740 円");
   });
 
+  it("結果の「証明発行へ」CTAで onProceedToIssue が算定条件付きで呼ばれる", async () => {
+    const onProceedToIssue = vi.fn();
+    render(<CertFeeView onCalc={vi.fn().mockResolvedValue(result)} onProceedToIssue={onProceedToIssue} />);
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("button", { name: /手数料を算定/ }));
+    await screen.findByRole("status");
+    await user.click(screen.getByRole("button", { name: /証明発行へ/ }));
+    expect(onProceedToIssue).toHaveBeenCalledWith({ certType: "住民票の写し", copies: 1, postal: false });
+  });
+
   it("郵送チェックと通数を反映して算定リクエストを送る", async () => {
     const onCalc = vi.fn().mockResolvedValue(result);
     render(<CertFeeView onCalc={onCalc} />);
