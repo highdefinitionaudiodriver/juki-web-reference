@@ -1,6 +1,7 @@
 import { useEffect, useState } from "react";
 import type { Announcement, Overview, ViewId } from "../types";
 import { Field } from "../components/Field";
+import { BarChart } from "../components/BarChart";
 
 type Props = {
   load: () => Promise<Overview>;
@@ -105,6 +106,33 @@ export function OverviewView({ load, onNavigate, loadAnnouncements, onCreateAnno
             <span className="stat-label">{c.label}</span>
           </button>
         ))}
+      </div>
+
+      <div className="chart-grid" style={{ marginTop: 20 }}>
+        <div className="chart-panel">
+          <h3>住民の構成</h3>
+          <BarChart
+            ariaLabel="住民の構成"
+            rows={[
+              { label: "現在住民", value: ov.residents.active },
+              { label: "外国人住民", value: ov.residents.foreigners },
+              { label: "特別永住者", value: ov.residents.specialPermanent },
+              { label: "抑止対象", value: ov.residents.restricted },
+            ]}
+          />
+        </div>
+        <div className="chart-panel">
+          <h3>交付・連携の状況</h3>
+          <BarChart
+            ariaLabel="交付・連携の状況"
+            rows={[
+              { label: "証明書交付", value: ov.certificates },
+              { label: "コンビニ交付", value: ov.conveniRequests },
+              { label: "本人通知発出", value: ov.notifications },
+              { label: "審査待ち異動", value: ov.transactions.pendingApproval },
+            ]}
+          />
+        </div>
       </div>
     </section>
   );

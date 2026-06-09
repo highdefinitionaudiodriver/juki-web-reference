@@ -1,5 +1,5 @@
 import { describe, expect, it, vi } from "vitest";
-import { render, screen, waitFor } from "@testing-library/react";
+import { render, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { OverviewView } from "./OverviewView";
 import type { Overview } from "../types";
@@ -18,19 +18,22 @@ const overview: Overview = {
 
 describe("OverviewView (SCR-002 ダッシュボード)", () => {
   it("主要指標を表示する", async () => {
-    render(<OverviewView load={vi.fn().mockResolvedValue(overview)} onNavigate={vi.fn()} />);
+    const { container } = render(<OverviewView load={vi.fn().mockResolvedValue(overview)} onNavigate={vi.fn()} />);
     await waitFor(() => expect(screen.getByText("住民（現在）")).toBeInTheDocument());
-    expect(screen.getByText("28")).toBeInTheDocument();
-    expect(screen.getByText("抑止対象")).toBeInTheDocument();
+    // 可視化グラフでも同じラベル/値が出るため、カードグリッド内に絞って検証する
+    const grid = within(container.querySelector(".card-grid") as HTMLElement);
+    expect(grid.getByText("28")).toBeInTheDocument();
+    expect(grid.getByText("抑止対象")).toBeInTheDocument();
     expect(screen.getByText("検知アラート")).toBeInTheDocument();
   });
 
   it("カードクリックで onNavigate が呼ばれる", async () => {
     const onNavigate = vi.fn();
-    render(<OverviewView load={vi.fn().mockResolvedValue(overview)} onNavigate={onNavigate} />);
-    await waitFor(() => expect(screen.getByText("抑止対象")).toBeInTheDocument());
+    const { container } = render(<OverviewView load={vi.fn().mockResolvedValue(overview)} onNavigate={onNavigate} />);
+    await waitFor(() => expect(screen.getByText("住民（現在）")).toBeInTheDocument());
+    const grid = within(container.querySelector(".card-grid") as HTMLElement);
     const user = userEvent.setup();
-    await user.click(screen.getByText("抑止対象"));
+    await user.click(grid.getByText("抑止対象"));
     expect(onNavigate).toHaveBeenCalledWith("restriction");
   });
 

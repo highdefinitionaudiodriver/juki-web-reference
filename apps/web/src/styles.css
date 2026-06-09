@@ -128,3 +128,15 @@ button:active{transform:translateY(1px)}
 html{scrollbar-gutter:stable}
 .shell{min-height:100dvh}
 /* ════════ /RESP-v4 ════════ */
+
+/* ダッシュボード可視化（横棒グラフ・外部ライブラリ非依存） */
+.chart-grid{display:grid;grid-template-columns:1fr 1fr;gap:16px}
+.chart-panel{border:1px solid var(--line);border-radius:8px;padding:14px 16px;background:var(--panel)}
+.chart-panel h3{margin:0 0 10px;font-size:.95rem}
+.chart-bars{display:flex;flex-direction:column;gap:8px}
+.chart-row{display:grid;grid-template-columns:92px 1fr 44px;align-items:center;gap:8px}
+.chart-label{font-size:.8rem;overflow:hidden;text-overflow:ellipsis;white-space:nowrap}
+.chart-track{display:block;background:#eef2f6;border-radius:6px;height:16px;overflow:hidden}
+.chart-fill{display:block;height:100%;min-width:2px;border-radius:6px;background:linear-gradient(90deg,#4267ac,#087f8c)}
+.chart-value{font-size:.8rem;font-weight:700;text-align:right}
+@media (max-width:720px){.chart-grid{grid-template-columns:1fr}}
