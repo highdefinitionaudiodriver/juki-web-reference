@@ -11,6 +11,21 @@ const distDir = resolve("apps/web/dist");
 const legacyDir = resolve("apps/web-legacy");
 const webRoot = existsSync(distDir) ? distDir : legacyDir;
 
+// ── 住民票等の証明手数料の算定（標準仕様書: 証明種別×通数。手数料額は手数料条例パラメータ）──
+const JUMIN_CERT_FEES = {
+  "住民票の写し": 300, "住民票記載事項証明書": 300, "印鑑登録証明書": 300,
+  "戸籍の附票の写し": 300, "不在住証明書": 300, "不在籍証明書": 300,
+};
+const JUMIN_POSTAL_FEE = 140;
+function computeJuminCertFee({ certType, copies = 1, postal = false }) {
+  const unit = JUMIN_CERT_FEES[certType];
+  if (unit === undefined) return { error: "unknown certType", certType };
+  const n = Math.max(1, Number(copies) || 1);
+  const subtotal = unit * n;
+  const postalFee = postal ? JUMIN_POSTAL_FEE : 0;
+  return { certType, unitFee: unit, copies: n, subtotal, postalFee, total: subtotal + postalFee };
+}
+
 const state = {
   residents: structuredClone(residents),
   transactions: structuredClone(transactions),
@@ -1623,6 +1638,16 @@ async function handleApi(req, res, reqUrl) {
       } catch { /* 通知失敗は無視（状態更新自体は成功） */ }
     }
     return json(res, 200, item);
+  }
+
+  // ── 住民票等の証明手数料の算定（標準仕様書準拠）──
+  if (req.method === "POST" && path === "/certificates/fee") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const result = computeJuminCertFee(body || {});
+    if (result.error) return json(res, 400, result);
+    audit(user, "CALC", "CERT_FEE", result.certType, { total: result.total });
+    return json(res, 200, result);
   }
 
   return json(res, 404, { code: "NOT_FOUND", message: "APIが見つかりません。" });

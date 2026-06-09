@@ -535,6 +535,11 @@ paths:
       tags: [link]
       summary: オンライン申請 受付簿の一覧（職員用, VIEW）
       responses: { '200': { description: OK }, '403': { description: Forbidden } }
+  /certificates/fee:
+    post:
+      tags: [certificate]
+      summary: 住民票等の証明手数料の算定（証明種別×通数＋郵送料。手数料額は条例パラメータ。VIEW）
+      responses: { '200': { description: 算定結果（unitFee, total） }, '400': { description: unknown certType }, '403': { description: Forbidden } }
   /link/applications/export:
     get:
       tags: [link]
