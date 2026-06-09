@@ -7,6 +7,8 @@ import type {
   CodeIssueResult,
   CertificateIssue,
   CertificateReq,
+  CertFeeReq,
+  CertFeeResult,
   EucAsyncJob,
   EucQueryReq,
   ForeignerExpiryJob,
@@ -141,6 +143,7 @@ export const api = {
   issueJuminCode: (body: JuminCodeReq) => request<CodeIssueResult>("/codes/jumin", { method: "POST", body: body as unknown as BodyInit }),
   issueMyNumber: (body: MyNumberReq) => request<CodeIssueResult>("/codes/mynumber", { method: "POST", body: body as unknown as BodyInit }),
   issueCertificate: (body: CertificateReq) => request<CertificateIssue>("/certificates/jumin", { method: "POST", body: body as unknown as BodyInit }),
+  certFee: (body: CertFeeReq) => request<CertFeeResult>("/certificates/fee", { method: "POST", body: body as unknown as BodyInit }),
   certificateHistory: (residentId: string) =>
     request<{ residentId: string; total: number; history: Array<{ issueId: string; formId: string; channel: string; usageText: string; fee: number; issuedAt: string }> }>(
       `/residents/${residentId}/certificates`),

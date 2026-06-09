@@ -15,6 +15,7 @@ import { ResidentView } from "./views/ResidentView";
 import { MoveView } from "./views/MoveView";
 import { OfficialView } from "./views/OfficialView";
 import { CertificateView } from "./views/CertificateView";
+import { CertFeeView } from "./views/CertFeeView";
 import { ReportsView } from "./views/ReportsView";
 import { AdminView } from "./views/AdminView";
 import { RestrictionView } from "./views/RestrictionView";
@@ -37,6 +38,7 @@ const NAV: Array<[ViewId, string]> = [
   ["move", "異動"],
   ["official", "職権異動"],
   ["certificate", "証明発行"],
+  ["fee", "手数料算定"],
   ["restriction", "抑止設定"],
   ["notify", "本人通知"],
   ["conveni", "コンビニ交付"],
@@ -238,6 +240,19 @@ export function App() {
             }
           }}
           loadHistory={async (rid) => (await api.certificateHistory(rid)).history}
+        />
+      )}
+      {view === "fee" && (
+        <CertFeeView
+          onCalc={async (req) => {
+            try {
+              const r = await api.certFee(req);
+              notify(`手数料を算定しました: ${r.certType} × ${r.copies}通 = ${r.total.toLocaleString("ja-JP")}円`);
+              return r;
+            } catch (e) {
+              setNotice({ kind: "err", message: `手数料の算定に失敗しました: ${String(e)}` });
+            }
+          }}
         />
       )}
       {view === "notify" && (

@@ -28,7 +28,18 @@ export type ForeignerExpiryReportReq = Schemas["ForeignerExpiryReportReq"];
 export type ForeignerExpiryJob = Schemas["ForeignerExpiryJob"];
 export type AliasName = Schemas["AliasName"];
 
-export type ViewId = "overview" | "search" | "resident" | "move" | "official" | "certificate" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts" | "eucdesign" | "batch" | "link";
+export type ViewId = "overview" | "search" | "resident" | "move" | "official" | "certificate" | "fee" | "restriction" | "reports" | "admin" | "notify" | "conveni" | "alias" | "special" | "alerts" | "eucdesign" | "batch" | "link";
+
+// 証明手数料の算定（標準仕様書: 証明種別×通数 + 郵送料）
+export type CertFeeReq = { certType: string; copies: number; postal: boolean };
+export type CertFeeResult = {
+  certType: string;
+  unitFee: number;
+  copies: number;
+  subtotal: number;
+  postalFee: number;
+  total: number;
+};
 
 export type LinkApplication = {
   id: string;
