@@ -86,6 +86,25 @@ describe("SearchView", () => {
     expect(screen.getByText("現住")).toBeInTheDocument();
   });
 
+  it("氏名ヘッダのクリックで結果を昇順/降順に並び替える", async () => {
+    const three: Resident[] = [
+      { ...residents[0], residentId: "R-003", familyNameKanji: "佐藤", familyNameKana: "サトウ", givenNameKana: "イチ" },
+      { ...residents[0], residentId: "R-001", familyNameKanji: "鈴木", familyNameKana: "スズキ", givenNameKana: "ニ" },
+      { ...residents[0], residentId: "R-002", familyNameKanji: "田中", familyNameKana: "タナカ", givenNameKana: "サン" },
+    ];
+    render(
+      <SearchView criteria={criteria} residents={three} onChange={vi.fn()} onSearch={vi.fn()} onSelect={vi.fn()} onExport={vi.fn()} />,
+    );
+    const user = userEvent.setup();
+    const order = () => Array.from(document.querySelectorAll("tbody tr td:first-child")).map((td) => td.textContent);
+    await user.click(screen.getByRole("columnheader", { name: /氏名/ }));
+    expect(order()).toEqual(["R-003", "R-001", "R-002"]); // サトウ<スズキ<タナカ 昇順
+    expect(screen.getByRole("columnheader", { name: /氏名/ })).toHaveAttribute("aria-sort", "ascending");
+    await user.click(screen.getByRole("columnheader", { name: /氏名/ }));
+    expect(order()).toEqual(["R-002", "R-001", "R-003"]); // 降順
+    expect(screen.getByRole("columnheader", { name: /氏名/ })).toHaveAttribute("aria-sort", "descending");
+  });
+
   it("CSV出力ボタンで onExport が呼ばれる", async () => {
     const onExport = vi.fn();
     render(

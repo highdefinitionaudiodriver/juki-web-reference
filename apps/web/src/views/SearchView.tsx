@@ -1,3 +1,4 @@
+import { useState } from "react";
 import type { Resident, SearchCriteria } from "../types";
 import { Field } from "../components/Field";
 import { Badges } from "../components/Badges";
@@ -11,7 +12,29 @@ type Props = {
   onExport: () => void;
 };
 
+type SortKey = "residentId" | "name" | "birthDate" | "addressText";
+const SORT_VALUE: Record<SortKey, (r: Resident) => string> = {
+  residentId: (r) => r.residentId ?? "",
+  name: (r) => `${r.familyNameKana ?? ""} ${r.givenNameKana ?? ""}`,
+  birthDate: (r) => r.birthDate ?? "",
+  addressText: (r) => r.addressText ?? "",
+};
+
 export function SearchView({ criteria, residents, onChange, onSearch, onSelect, onExport }: Props) {
+  const [sort, setSort] = useState<{ key: SortKey | ""; dir: 1 | -1 }>({ key: "", dir: 1 });
+  const sorted = sort.key
+    ? [...residents].sort((a, b) => SORT_VALUE[sort.key as SortKey](a).localeCompare(SORT_VALUE[sort.key as SortKey](b), "ja") * sort.dir)
+    : residents;
+  const toggleSort = (key: SortKey) => setSort((s) => (s.key === key ? { key, dir: s.dir === 1 ? -1 : 1 } : { key, dir: 1 }));
+  const indicator = (key: SortKey) => (sort.key === key ? (sort.dir === 1 ? " ▲" : " ▼") : "");
+  const ariaSort = (key: SortKey): "ascending" | "descending" | "none" =>
+    sort.key === key ? (sort.dir === 1 ? "ascending" : "descending") : "none";
+  const sortableTh = (key: SortKey, label: string) => (
+    <th onClick={() => toggleSort(key)} aria-sort={ariaSort(key)} style={{ cursor: "pointer", userSelect: "none" }} title="クリックで並び替え">
+      {label}{indicator(key)}
+    </th>
+  );
+
   return (
     <section className="panel">
       <div className="toolbar">
@@ -40,16 +63,16 @@ export function SearchView({ criteria, residents, onChange, onSearch, onSelect, 
         <table>
           <thead>
             <tr>
-              <th>宛名番号</th>
-              <th>氏名</th>
-              <th>生年月日</th>
-              <th>住所</th>
+              {sortableTh("residentId", "宛名番号")}
+              {sortableTh("name", "氏名")}
+              {sortableTh("birthDate", "生年月日")}
+              {sortableTh("addressText", "住所")}
               <th>続柄</th>
               <th>状態</th>
             </tr>
           </thead>
           <tbody>
-            {residents.map((r) => (
+            {sorted.map((r) => (
               <tr key={r.residentId} onClick={() => r.residentId && onSelect(r.residentId)}>
                 <td>{r.residentId}</td>
                 <td>
