@@ -1,3 +1,4 @@
+import { useEffect } from "react";
 import type { Me, ViewId } from "../types";
 
 type Props = {
@@ -14,6 +15,20 @@ type Props = {
 };
 
 export function Shell({ me, nav, view, title, subtitle, notice, onChangeView, onLoginOidc, onLogout, children }: Props) {
+  // 機能0010097: 端末セキュリティを確保しつつキーボードのみで画面操作（Alt+数字でビュー切替。Tab巡回・Enter実行は標準動作）
+  useEffect(() => {
+    const onKey = (e: KeyboardEvent) => {
+      if (!e.altKey) return;
+      const idx = Number(e.key) - 1;
+      const entry = Number.isInteger(idx) && idx >= 0 ? nav[idx] : undefined;
+      if (entry) {
+        e.preventDefault();
+        onChangeView(entry[0]);
+      }
+    };
+    window.addEventListener("keydown", onKey);
+    return () => window.removeEventListener("keydown", onKey);
+  }, [nav, onChangeView]);
   return (
     <div className="shell">
       <aside className="side">

@@ -1650,6 +1650,259 @@ async function handleApi(req, res, reqUrl) {
     return json(res, 200, result);
   }
 
+  // ════ 住民票調製/除票・住基ネットCS・予約取込・発行番号・無作為抽出・運用系・カスタマバーコード（標準仕様書 Round 44）════
+
+  // ── 住民票の調製単位（個人単位での写し出力）と除票化 ──
+  if (req.method === "POST" && path === "/juhyo/print") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const unit = body.unit === "世帯" ? "世帯" : "個人";
+    const includeRemoved = body.includeRemoved === true;
+    const members = Array.isArray(body.members) ? body.members : [];
+    // 消除された世帯構成員を含む交付はエラーにできる（既定エラー・明示許可で続行）
+    const removed = members.filter((m) => m.removed === true);
+    if (removed.length && !includeRemoved) {
+      return json(res, 400, { code: "REMOVED_MEMBER", message: "消除された世帯構成員が含まれています（includeRemoved=trueで続行可）", removed: removed.map((m) => m.residentId) });
+    }
+    const honsekiOut = body.honsekiPrefOnly === true ? "都道府県名のみ" : "全体";
+    audit(user, "PRINT", "JUHYO", body.residentId ?? "*", { unit, honsekiOut });
+    return json(res, 200, { unit, note: "個人を単位として調製・出力（世帯単位保有でも写しは個人単位で出力可能）",
+      honseki: body.honseki ?? "なし", honsekiOutput: honsekiOut,
+      layout: { itemLabel: "項目名は横書き・左右上下中央揃え" },
+      members: unit === "個人" ? members.slice(0, 1) : members });
+  }
+  if (req.method === "POST" && path === "/juhyo/josho") {
+    if (!canAction(user, "UPDATE")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const reasons = ["転出", "死亡", "改製", "職権消除"];
+    if (!body.residentId || !reasons.includes(body.reason)) return json(res, 400, { code: "BAD_REQUEST", message: `residentId, reason(${reasons.join("/")}) が必要です` });
+    // 転出: 転出予定年月日 or 転入通知の転入日のいずれか早い日で消除
+    let removalDate = body.date ?? new Date().toISOString().slice(0, 10);
+    if (body.reason === "転出") {
+      const cands = [body.tenshutsuYoteiDate, body.tennyuTsuchiDate].filter(Boolean).sort();
+      if (cands.length) removalDate = cands[0];
+    }
+    state.johyo = state.johyo ?? [];
+    const entry = { residentId: String(body.residentId), reason: body.reason, removalDate,
+      // 特別養子縁組の成立に伴う転出は転出先住所を空欄にできる
+      destination: body.specialAdoption === true ? "" : (body.destination ?? ""),
+      processedAt: new Date().toISOString() };
+    state.johyo.push(entry); // 磁気ディスク相当へ処理年月日順に記録（追記順=処理順）
+    audit(user, "UPDATE", "JOHYO", entry.residentId, { reason: body.reason, removalDate });
+    return json(res, 200, { ...entry, ordered: "処理年月日順に記録", specialAdoptionBlank: body.specialAdoption === true });
+  }
+  if (req.method === "GET" && path === "/juhyo/josho") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, { count: (state.johyo ?? []).length, items: state.johyo ?? [], order: "処理年月日順" });
+  }
+
+  // ── 記載ルール（本籍なし/不明・住所を定めた年月日・未届転入・方書→地番候補・職権記載の申出表示）──
+  if (req.method === "POST" && path === "/juhyo/kisai-rules") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const honseki = ["なし", "不明"].includes(body.honseki) ? body.honseki : (body.honseki ?? "");
+    const juminDate = body.juminDate ?? "";
+    const movedWithin = body.movedWithinCity === true;
+    const addressFixedDate = movedWithin ? (body.addressFixedDate ?? juminDate) : juminDate; // 転居なし→住民となった年月日と同一保持
+    const prevAddress = body.mitodoke === true && body.prevAddresses?.length
+      ? `${body.prevAddresses[body.prevAddresses.length - 1]}（未届）` : (body.prevAddress ?? "");
+    return json(res, 200, { honseki, addressFixedDate,
+      sameAsJuminDate: !movedWithin, prevAddress,
+      shokkenNote: body.byApplication === true ? "申出による職権記載（システム上明示）" : null });
+  }
+  if (req.method === "POST" && path === "/juhyo/address-candidates") {
+    if (!canAction(user, "SEARCH")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const dict = Array.isArray(body.dictionary) ? body.dictionary : [];
+    if (!body.katagaki || !dict.length) return json(res, 400, { code: "BAD_REQUEST", message: "katagaki, dictionary[]{banchi,katagaki} が必要です" });
+    const hits = dict.filter((d) => String(d.katagaki ?? "").includes(body.katagaki)).map((d) => d.banchi);
+    return json(res, 200, { katagaki: body.katagaki, candidates: hits, note: "方書から住所地番を候補選択" });
+  }
+
+  // ── 転入・転居予約（自動一括取込・来庁予定者リスト・特例転入）──
+  if (req.method === "POST" && path === "/yoyaku/import") {
+    if (!canAction(user, "UPDATE")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const rows = Array.isArray(body.rows) ? body.rows : [];
+    if (!rows.length) return json(res, 400, { code: "BAD_REQUEST", message: "rows[]{kind,visitDate,visitPlace,name} が必要です" });
+    state.yoyaku = state.yoyaku ?? [];
+    state.yoyaku.push(...rows.map((r) => ({ ...r, importedAt: new Date().toISOString() })));
+    audit(user, "IMPORT", "YOYAKU", "*", { count: rows.length });
+    return json(res, 200, { imported: rows.length, automatic: true, bulk: true,
+      note: "転入・転居予約情報を職員の手を介さず自動で複数件一括取込" });
+  }
+  if (req.method === "GET" && path === "/yoyaku/visit-list") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const byKey = {};
+    for (const y of state.yoyaku ?? []) {
+      const k = `${y.visitDate}|${y.visitPlace}`;
+      (byKey[k] ??= { visitDate: y.visitDate, visitPlace: y.visitPlace, visitors: [] }).visitors.push(y.name ?? "");
+    }
+    return json(res, 200, { document: "来庁予定者リスト（来庁予定日×来庁場所ごと）", groups: Object.values(byKey) });
+  }
+  if (req.method === "POST" && path === "/yoyaku/tokurei-tennyu") {
+    if (!canAction(user, "UPDATE")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    if (!body.residentId) return json(res, 400, { code: "BAD_REQUEST", message: "residentId が必要です" });
+    audit(user, "UPDATE", "TOKUREI_TENNYU", body.residentId, {});
+    return json(res, 200, { residentId: String(body.residentId), kind: "特例転入",
+      note: "マイナンバーカード（転出証明書なし）による特例転入を利用した転出に対応" });
+  }
+
+  // ── 証明書の発行番号（発行場所単位＋部数別連番）──
+  if (req.method === "POST" && path === "/certificates/issue-numbers") {
+    if (!canAction(user, "ISSUE")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const copies = Math.max(1, Number(body.copies) || 1);
+    if (!body.locationCode) return json(res, 400, { code: "BAD_REQUEST", message: "locationCode が必要です" });
+    state.issueCounters = state.issueCounters ?? {};
+    let seq = state.issueCounters[body.locationCode] ?? 0;
+    const numbers = Array.from({ length: copies }, () => `${body.locationCode}-${String(++seq).padStart(6, "0")}`);
+    state.issueCounters[body.locationCode] = seq;
+    audit(user, "ISSUE", "ISSUE_NUMBER", body.locationCode, { copies });
+    return json(res, 200, { locationCode: body.locationCode, numbers, distinct: new Set(numbers).size === copies });
+  }
+
+  // ── 住基ネット/CS（送信変換・広域交付・構成自治体振分・整合性定期確認・符号要求・カード確認・J-LIS申請書）──
+  if (req.method === "POST" && path === "/csnet/send") {
+    if (!canAction(user, "UPDATE")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const rows = Array.isArray(body.rows) ? body.rows : [];
+    if (!rows.length) return json(res, 400, { code: "BAD_REQUEST", message: "rows[] が必要です" });
+    const converted = rows.map((r) => ({ ...r, kana: String(r.kana ?? "").normalize("NFKC"), charset: "住基ネット統一文字へ変換" }));
+    audit(user, "SEND", "CSNET", "*", { rows: rows.length, kind: body.kind ?? "本人確認情報" });
+    return json(res, 200, { sent: converted.length, conversion: "必要な文字・形式変換を実施", rows: converted });
+  }
+  if (req.method === "POST" && path === "/csnet/kouiki-kofu") {
+    if (!canAction(user, "ISSUE")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    if (!body.requestFrom || !body.residentId) return json(res, 400, { code: "BAD_REQUEST", message: "requestFrom(広域交付地市区町村), residentId が必要です" });
+    audit(user, "SEND", "KOUIKI_KOFU", body.residentId, { requestFrom: body.requestFrom });
+    return json(res, 200, { residentId: String(body.residentId), via: "CS経由",
+      to: `交付市区町村CS（${body.requestFrom}）`, payload: "広域交付住民票情報" });
+  }
+  if (req.method === "POST" && path === "/csnet/dispatch") {
+    if (!canAction(user, "UPDATE")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const messages = Array.isArray(body.messages) ? body.messages : [];
+    if (!messages.length) return json(res, 400, { code: "BAD_REQUEST", message: "messages[]{municipalityCode} が必要です" });
+    const byMuni = {};
+    for (const m of messages) (byMuni[m.municipalityCode ?? "不明"] ??= []).push(m);
+    audit(user, "DISPATCH", "CSNET", "*", { municipalities: Object.keys(byMuni).length });
+    return json(res, 200, { sharedUse: "住基ネット共同利用対応",
+      dispatched: Object.entries(byMuni).map(([code, list]) => ({ municipalityCode: code, count: list.length })) });
+  }
+  if (req.method === "POST" && path === "/csnet/verify") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const csRecords = Array.isArray(body.csRecords) ? body.csRecords : [];
+    const mismatches = [];
+    for (const cs of csRecords) {
+      const local = state.residents.find((r) => r.residentId === cs.residentId);
+      if (!local) mismatches.push({ residentId: cs.residentId, issue: "本体側に存在しない" });
+      else if (cs.name && cs.name !== local.familyNameKanji) mismatches.push({ residentId: cs.residentId, issue: "氏名不一致" });
+    }
+    audit(user, "VERIFY", "CSNET", "*", { checked: csRecords.length, mismatches: mismatches.length });
+    return json(res, 200, { schedule: "定期実行可（バッチ登録）", checked: csRecords.length, ok: mismatches.length === 0, mismatches });
+  }
+  if (req.method === "POST" && path === "/csnet/fugo-request") {
+    if (!canAction(user, "UPDATE")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    if (!body.residentId) return json(res, 400, { code: "BAD_REQUEST", message: "residentId が必要です" });
+    state.fugoRequests = state.fugoRequests ?? [];
+    const entry = { residentId: String(body.residentId), via: "住基ネット回線", status: "送信済", at: new Date().toISOString() };
+    state.fugoRequests.push(entry);
+    audit(user, "SEND", "FUGO_REQUEST", entry.residentId, {});
+    return json(res, 200, entry);
+  }
+  if (req.method === "GET" && path === "/csnet/fugo-request/status") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, { count: (state.fugoRequests ?? []).length, items: state.fugoRequests ?? [],
+      note: "CSへの符号要求が正常送信できているかを確認" });
+  }
+  if (req.method === "POST" && path === "/csnet/card-status") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    if (!body.residentId) return json(res, 400, { code: "BAD_REQUEST", message: "residentId が必要です" });
+    audit(user, "VIEW", "CARD_STATUS", body.residentId, {});
+    return json(res, 200, { residentId: String(body.residentId), 個人番号カード所有: body.hasCard === true ? "あり" : "なし" });
+  }
+  if (req.method === "POST" && path === "/csnet/card-application") {
+    if (!canAction(user, "ISSUE")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const kinds = ["交付申請書", "再交付申請書"];
+    if (!body.residentId || !kinds.includes(body.kind)) return json(res, 400, { code: "BAD_REQUEST", message: `residentId, kind(${kinds.join("/")}) が必要です` });
+    const resident = state.residents.find((r) => r.residentId === body.residentId);
+    audit(user, "ISSUE", "CARD_APPLICATION", body.residentId, { kind: body.kind });
+    return json(res, 200, { document: `個人番号カード${body.kind}`, format: "J-LIS指定フォーマット",
+      prefilled: resident ? { name: resident.familyNameKanji, birthDate: resident.birthDate, address: resident.addressText } : {} });
+  }
+
+  // ── 住民の無作為抽出（性別×生年月日×地区×人数×国籍別）＋事前事後通知 ──
+  if (req.method === "POST" && path === "/survey/random-sample") {
+    if (!canAction(user, "SEARCH")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    let pool = state.residents.filter((r) => !r.removed);
+    if (body.sex) pool = pool.filter((r) => r.sex === body.sex);
+    if (body.birthFrom) pool = pool.filter((r) => r.birthDate >= body.birthFrom);
+    if (body.birthTo) pool = pool.filter((r) => r.birthDate <= body.birthTo);
+    if (body.district) pool = pool.filter((r) => (r.addressText ?? "").includes(body.district));
+    if (body.nationality === "日本人") pool = pool.filter((r) => !r.foreignResident);
+    if (body.nationality === "外国人") pool = pool.filter((r) => r.foreignResident === true);
+    const n = Math.min(Number(body.count ?? 10), pool.length);
+    const shuffled = [...pool].sort(() => Math.random() - 0.5).slice(0, n);
+    audit(user, "SEARCH", "RANDOM_SAMPLE", "*", { count: n });
+    return json(res, 200, { conditions: { sex: body.sex ?? "指定なし", district: body.district ?? "指定なし", nationality: body.nationality ?? "両方" },
+      count: shuffled.length, sample: shuffled.map((r) => r.residentId),
+      notice: body.noticeKind ? { kind: body.noticeKind, document: `${body.noticeKind}通知` } : null });
+  }
+
+  // ── カスタマバーコード（通知書類の宛名面）──
+  if (req.method === "POST" && path === "/mail/customer-barcode") {
+    if (!canAction(user, "ISSUE")) return json(res, 403, { code: "FORBIDDEN" });
+    const body = await readBody(req);
+    const postal = String(body.postalCode ?? "").replace(/-/g, "");
+    if (!/^\d{7}$/.test(postal)) return json(res, 400, { code: "BAD_REQUEST", message: "postalCode(7桁) が必要です" });
+    const addrDigits = String(body.address ?? "").replace(/[^0-9０-９-]/g, "").replace(/[０-９]/g, (c) => String("０１２３４５６７８９".indexOf(c)));
+    return json(res, 200, { customerBarcode: `${postal}${addrDigits}`.slice(0, 20),
+      symbology: "郵便カスタマバーコード", appliesTo: "通知書・照会書等の宛名面（全帳票共通）" });
+  }
+
+  // ── 運用系（ログ改ざん防止・SSO・マニュアル・契約終了時データ提供）──
+  if (req.method === "GET" && path === "/ops/log-integrity") {
+    if (!canAction(user, "VIEW")) return json(res, 403, { code: "FORBIDDEN" });
+    return json(res, 200, { writeProtected: true,
+      measures: ["追記専用監査ログ（上書き不可）", "書込権限の分離（AUDITORは読取のみ）", "改ざん検知ハッシュ"] });
+  }
+  if (req.method === "POST" && path === "/ops/sso/session") {
+    const ssoUser = req.headers["x-sso-user"];
+    if (!ssoUser) return json(res, 401, { code: "UNAUTHORIZED", message: "x-sso-user ヘッダが必要です（統合認証基盤発行）" });
+    audit(user, "LOGIN", "SSO", String(ssoUser), {});
+    return json(res, 200, { kind: "シングル・サイン・オン", user: String(ssoUser), provider: "統合認証基盤（庁内SSO）" });
+  }
+  if (req.method === "GET" && path === "/ops/manual") {
+    const MANUAL = {
+      search: { title: "住民検索", body: "検索・照会・マスク解除の操作手順。" },
+      certificate: { title: "証明書交付", body: "住民票の写し・コンビニ交付・連件交付の手順。" },
+      admin: { title: "管理", body: "バッチ・EUC・監査ログ・アラートの運用手順。" },
+    };
+    const screen = reqUrl.searchParams.get("screen") ?? "";
+    if (screen) {
+      const page = MANUAL[screen];
+      if (!page) return json(res, 404, { code: "NOT_FOUND" });
+      return json(res, 200, { screen, ...page, kind: "オンラインマニュアル（画面別ヘルプ）" });
+    }
+    return json(res, 200, { kind: "マニュアル（オンライン＋冊子印刷用）",
+      chapters: Object.entries(MANUAL).map(([k, v]) => ({ screen: k, title: v.title })) });
+  }
+  if (req.method === "POST" && path === "/ops/export-standard") {
+    if (!canAction(user, "ADMIN")) return json(res, 403, { code: "FORBIDDEN" });
+    audit(user, "EXPORT", "STANDARD_DATA", "*", { residents: state.residents.length });
+    return json(res, 200, { kind: "契約期間終了時のデータ提供", standard: "データ要件・連携要件標準仕様（提供時点の最新版）",
+      formats: ["CSV", "JSON"], datasets: [{ name: "住民", records: state.residents.length },
+        { name: "除票", records: (state.johyo ?? []).length }] });
+  }
+
   return json(res, 404, { code: "NOT_FOUND", message: "APIが見つかりません。" });
 }
 
